@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンカードバトル HJKDR</title>
+    <!-- アイコンフォントの読み込み -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* 
+           デザインのせっていです。
+           きらきらした、かっこいい画面にします。
+        */
+        :root {
+            --primary-bg: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --p1-color: #3b82f6;
+            --p2-color: #ef4444;
+            --gold: #f59e0b;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            background-color: var(--primary-bg);
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(239, 68, 68, 0.2) 0%, transparent 50%);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            /* 縦スクロールをさせないようにします */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            width: 95vw;
+            height: 95vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 
+           タイトル部分 
+        */
+        header {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+        }
+
+        /* 
+           メイン画面のきりかえ（デッキ選択とバトル） 
+        */
+        .screen {
+            flex: 1;
+            display: none;
+            padding: 20px;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* 
+           デッキ選択画面のスタイル 
+        */
+        #setup-screen {
+            align-items: center;
+        }
+
+        .setup-columns {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            gap: 20px;
+        }
+
+        .player-setup {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-setup h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .p1-title {
+            color: var(--p1-color);
+        }
+
+        .p2-title {
+            color: var(--p2-color);
+        }
+
+        .card-list {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* 
+           カードのデザイン 
+        */
+        .card-item {
+            aspect-ratio: 2 / 3;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            position: relative;
+            padding: 5px;
+            text-align: center;
+        }
+
+        .card-item:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-item.selected {
+            border-color: var(--gold);
+            box-shadow: 0 0 15px var(--gold);
+            background: rgba(245, 158, 11, 0.2);
+        }
+
+        .card-item i {
+            font-size: 30px;
+            margin-bottom: 5px;
+        }
+
+        .card-name {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .card-stats {
+            font-size: 9px;
+            margin-top: 3px;
+            opacity: 0.8;
+        }
+
+        .selection-count {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        #start-btn {
+            margin-top: 15px;
+            padding: 10px 40px;
+            font-size: 18px;
+            background: linear-gradient(to right, #f59e0b, #fbbf24);
+            border: none;
+            border-radius: 30px;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: none;
+            /* 全員えらんだらだします */
+        }
+
+        #start-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* 
+           バトル画面のスタイル (シンプルなプレマ)
+        */
+        #battle-screen {
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.02);
+            padding-bottom: 80px;
+            /* 下部操作エリアのスペース */
+        }
+
+        .battle-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            transition: box-shadow 0.3s;
+        }
+
+        .active-card-container {
+            width: 200px;
+            aspect-ratio: 2 / 3;
+            background: #222;
+            border: 4px solid #444;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .active-card-container.p2 {
+            border-color: var(--p2-color);
+        }
+
+        .active-card-container.p1 {
+            border-color: var(--p1-color);
+        }
+
+        .stat-display-bl {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .hp-bar-outer {
+            width: 100%;
+            height: 12px;
+            background: #111;
+            border-radius: 6px;
+            margin: 10px 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            width: 100%;
+            transition: width 0.5s ease;
+        }
+
+        /* 
+           ログとコマンド（シンプル版） 
+        */
+        #center-ui {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            height: 60px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        #log-area {
+            flex: 3;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            overflow-y: auto;
+            color: #eee;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #command-area {
+            flex: 1.5;
+            display: flex;
+            gap: 8px;
+        }
+
+        .cmd-btn {
+            flex: 1;
+            background: #fff;
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .cmd-btn:hover:not(:disabled) {
+            background: #ccc;
+        }
+
+        .cmd-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* スクロールバー */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <header>
+            <h1><i class="fas fa-bolt"></i> POKEMON CARD HJKDR</h1>
+        </header>
+
+        <!-- デッキ選択画面 -->
+        <div id="setup-screen" class="screen active">
+            <div class="setup-columns">
+                <!-- プレイヤー1 -->
+                <div class="player-setup">
+                    <h2 class="p1-title"><i class="fas fa-user"></i> プレイヤー 1</h2>
+                    <div id="p1-card-list" class="card-list"></div>
+                    <div class="selection-count">せんたく: <span id="p1-count">0</span> / 6</div>
+                </div>
+                <!-- プレイヤー2 -->
+                <div class="player-setup">
+                    <h2 class="p2-title"><i class="fas fa-robot"></i> プレイヤー 2</h2>
+                    <div id="p2-card-list" class="card-list"></div>
+                    <div class="selection-count">せんたく: <span id="p2-count">0</span> / 6</div>
+                </div>
+            </div>
+            <button id="start-btn" onclick="startGame()">バトル開始！</button>
+        </div>
+
+        <!-- バトル画面 -->
+        <div id="battle-screen" class="screen">
+            <!-- 相手エリア -->
+            <div class="battle-area">
+                <div id="p2-active-card" class="active-card-container p2">
+                    <!-- JavaScriptでなかみをかきます -->
+                </div>
+            </div>
+
+            <!-- ログとコマンド -->
+            <div id="center-ui">
+                <div id="log-area"></div>
+                <div id="command-area">
+                    <button class="cmd-btn" id="attack-btn" onclick="handleAction('attack')">たたかう</button>
+                    <button class="cmd-btn" id="switch-btn" onclick="handleAction('switch')">ポケモンいれかえ</button>
+                </div>
+            </div>
+
+            <!-- 自分エリア -->
+            <div class="battle-area">
+                <div id="p1-active-card" class="active-card-container p1">
+                    <!-- JavaScriptでなかみをかきます -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ポケモンのデータ（ポケキュン 〜 メガドリーム）。
+         * HIJGFDAシステム:
+         * H: HP
+         * I: Special/Status
+         * J: Type (属性)
+         * G: Speed/Skill
+         * F: Luck/Effect
+         * D: Defense
+         * A: Attack
+         */
+        const MASTER_CARDS = [
+            { name: "メガリザードンX", icon: "fa-fire", H: 220, I: 50, J: "炎/龍", G: 60, F: 50, D: 60, A: 110, color: "#00bfff" },
+            { name: "ドラパルト", icon: "fa-ghost", H: 150, I: 40, J: "龍/霊", G: 100, F: 40, D: 40, A: 80, color: "#4b0082" },
+            { name: "プクリン", icon: "fa-smile", H: 200, I: 30, J: "無/妖", G: 30, F: 90, D: 40, A: 40, color: "#ffc0cb" },
+            { name: "メガユキノオー", icon: "fa-snowflake", H: 190, I: 40, J: "草/氷", G: 20, F: 50, D: 80, A: 90, color: "#f0ffff" },
+            { name: "メガルカリオ", icon: "fa-fist-raised", H: 180, I: 50, J: "闘/鋼", G: 70, F: 40, D: 50, A: 100, color: "#4169e1" },
+            { name: "ピカチュウ", icon: "fa-bolt", H: 60, I: 10, J: "雷", G: 70, F: 30, D: 20, A: 40, color: "#ffd700" },
+            { name: "ブースターEX", icon: "fa-fire", H: 170, I: 30, J: "炎", G: 50, F: 40, D: 30, A: 70, color: "#ff4500" },
+            { name: "ニンフィアEX", icon: "fa-heart", H: 170, I: 20, J: "フェアリー", G: 40, F: 50, D: 40, A: 60, color: "#ffb6c1" },
+            { name: "メガサーナイトEX", icon: "fa-star", H: 210, I: 50, J: "フェアリー", G: 60, F: 60, D: 50, A: 90, color: "#dda0dd" },
+            { name: "メガレックウザEX", icon: "fa-dragon", H: 230, I: 60, J: "龍/無", G: 90, F: 40, D: 60, A: 120, color: "#3cb371" },
+            { name: "シェイミEX", icon: "fa-leaf", H: 110, I: 40, J: "無", G: 80, F: 70, D: 30, A: 30, color: "#98fb98" },
+            { name: "MミュウツーEX", icon: "fa-brain", H: 210, I: 70, J: "超", G: 70, F: 50, D: 50, A: 100, color: "#ba55d3" },
+            { name: "ボルケニオンEX", icon: "fa-steam", H: 180, I: 40, J: "炎/水", G: 30, F: 50, D: 70, A: 80, color: "#cd5c5c" },
+            { name: "ゼルネアスEX", icon: "fa-gem", H: 170, I: 60, J: "フェアリー", G: 40, F: 60, D: 40, A: 70, color: "#87cefa" },
+            { name: "イベルタルEX", icon: "fa-crow", H: 170, I: 60, J: "悪/飛", G: 50, F: 50, D: 40, A: 70, color: "#a52a2a" },
+            { name: "デデンネ", icon: "fa-mouse", H: 70, I: 20, J: "フェアリー", G: 60, F: 80, D: 20, A: 20, color: "#f0e68c" },
+            { name: "フーパEX", icon: "fa-ghost", H: 170, I: 80, J: "超", G: 40, F: 40, D: 30, A: 80, color: "#9370db" }
+        ];
+
+        let p1Deck = [];
+        let p2Deck = [];
+        let p1BattleDeck = [];
+        let p2BattleDeck = [];
+        let p1ActiveIndex = 0;
+        let p2ActiveIndex = 0;
+        let turn = 1; // 1: Player1, 2: Player2
+        let isGameOver = false;
+
+        /**
+         * さいしょのじゅんび
+         */
+        function initSetup() {
+            renderCardList("p1");
+            renderCardList("p2");
+        }
+
+        /**
+         * ならんでいるカードをつくって表示します (左下に HIJGFDA)
+         */
+        function renderCardList(pId) {
+            const listEl = document.getElementById(pId + "-card-list");
+            listEl.innerHTML = "";
+
+            MASTER_CARDS.forEach(function (card, index) {
+                const item = document.createElement("div");
+                item.className = "card-item";
+                item.style.borderLeft = "4px solid " + card.color;
+
+                item.innerHTML =
+                    '<i class="fas ' + card.icon + '" style="color:' + card.color + '"></i>' +
+                    '<div class="card-name">' + card.name + '</div>' +
+                    '<div style="position:absolute; bottom:5px; left:5px; font-size:7px; text-align:left; line-height:1.2; font-family:monospace; color:rgba(255,255,255,0.7);">' +
+                    "H" + card.H + " I" + card.I + " J" + card.J + "<br>" +
+                    "G" + card.G + " F" + card.F + " D" + card.D + " A" + card.A +
+                    '</div>';
+
+                item.onclick = function () {
+                    toggleCardSelection(pId, index, item);
+                };
+                listEl.appendChild(item);
+            });
+        }
+
+        function toggleCardSelection(pId, cardIndex, element) {
+            const deck = (pId === "p1") ? p1Deck : p2Deck;
+            const countEl = document.getElementById(pId + "-count");
+
+            const foundIndex = deck.indexOf(cardIndex);
+            if (foundIndex > -1) {
+                deck.splice(foundIndex, 1);
+                element.classList.remove("selected");
+            } else {
+                if (deck.length < 6) {
+                    deck.push(cardIndex);
+                    element.classList.add("selected");
+                }
+            }
+            countEl.innerText = deck.length;
+            checkStartButton();
+        }
+
+        function checkStartButton() {
+            const btn = document.getElementById("start-btn");
+            btn.style.display = (p1Deck.length === 6 && p2Deck.length === 6) ? "block" : "none";
+        }
+
+        function startGame() {
+            p1BattleDeck = p1Deck.map(function (idx) { return JSON.parse(JSON.stringify(MASTER_CARDS[idx])); });
+            p2BattleDeck = p2Deck.map(function (idx) { return JSON.parse(JSON.stringify(MASTER_CARDS[idx])); });
+
+            document.getElementById("setup-screen").classList.remove("active");
+            document.getElementById("battle-screen").classList.add("active");
+
+            addLog("バトル開始！ ポケキュン 〜 メガドリーム");
+            updateBattleUI();
+        }
+
+        function handleAction(type) {
+            if (isGameOver) return;
+            if (type === 'attack') executeAttack();
+            else if (type === 'switch') showSwitchMenu();
+        }
+
+        function executeAttack() {
+            const attacker = (turn === 1) ? p1BattleDeck[p1ActiveIndex] : p2BattleDeck[p2ActiveIndex];
+            const defender = (turn === 1) ? p2BattleDeck[p2ActiveIndex] : p1BattleDeck[p1ActiveIndex];
+
+            // ダメージ計算: A(こうげき) - D(ぼうぎょ/2) + ランダム
+            let damage = attacker.A - (defender.D / 2) + Math.floor(Math.random() * 15);
+            if (damage < 15) damage = 15; // さいてい保証
+            damage = Math.floor(damage);
+
+            defender.H -= damage;
+            if (defender.H < 0) defender.H = 0;
+
+            addLog("P" + turn + " " + attacker.name + " の攻撃！ " + damage + " ダメージ！");
+
+            // 演出としてカードを少し揺らします
+            const targetEl = document.getElementById((turn === 1 ? "p2" : "p1") + "-active-card");
+            targetEl.style.transform = "translateX(5px)";
+            setTimeout(function () { targetEl.style.transform = "translateX(-5px)"; }, 50);
+            setTimeout(function () { targetEl.style.transform = "translateX(0)"; }, 100);
+
+            if (defender.H === 0) {
+                addLog(defender.name + " は倒れた！");
+                checkVictory();
+                if (!isGameOver) {
+                    forceSwitch(turn === 1 ? 2 : 1);
+                    return;
+                }
+            }
+            if (!isGameOver) endTurn();
+        }
+
+        function showSwitchMenu() {
+            const deck = (turn === 1) ? p1BattleDeck : p2BattleDeck;
+            let msg = "交代するポケモンをえらんでください:\n";
+            deck.forEach(function (p, i) {
+                msg += (i + 1) + ": " + p.name + " (H:" + p.H + ")\n";
+            });
+            const choice = prompt(msg);
+            const idx = parseInt(choice) - 1;
+            if (deck[idx] && deck[idx].H > 0 && idx !== (turn === 1 ? p1ActiveIndex : p2ActiveIndex)) {
+                if (turn === 1) p1ActiveIndex = idx; else p2ActiveIndex = idx;
+                addLog("P" + turn + " は " + deck[idx].name + " に交代した！");
+                endTurn();
+            } else {
+                alert("交代できません。");
+            }
+        }
+
+        function forceSwitch(targetPlayer) {
+            const deck = (targetPlayer === 1) ? p1BattleDeck : p2BattleDeck;
+            const nextIdx = deck.findIndex(function (p) { return p.H > 0; });
+            if (nextIdx !== -1) {
+                if (targetPlayer === 1) p1ActiveIndex = nextIdx; else p2ActiveIndex = nextIdx;
+                addLog("P" + targetPlayer + " は " + deck[nextIdx].name + " をくりだした！");
+                updateBattleUI();
+            }
+        }
+
+        function endTurn() {
+            turn = (turn === 1) ? 2 : 1;
+            addLog("P" + turn + " のターンです。");
+            updateBattleUI();
+        }
+
+        function checkVictory() {
+            const p1Alive = p1BattleDeck.some(function (p) { return p.H > 0; });
+            const p2Alive = p2BattleDeck.some(function (p) { return p.H > 0; });
+            if (!p1Alive || !p2Alive) {
+                isGameOver = true;
+                const winner = p1Alive ? "プレイヤー 1" : "プレイヤー 2";
+                addLog("=== 決着！ " + winner + " の勝利！ ===");
+                alert(winner + " の勝利です！ おめでとう！");
+            }
+        }
+
+        function updateBattleUI() {
+            renderCard("p1", p1BattleDeck[p1ActiveIndex]);
+            renderCard("p2", p2BattleDeck[p2ActiveIndex]);
+
+            // ターン中の側を光らせる (シンプルなプレマ演出)
+            const p1Area = document.getElementById("p1-active-card").parentElement;
+            const p2Area = document.getElementById("p2-active-card").parentElement;
+            p1Area.style.boxShadow = (turn === 1) ? "inset 0 0 50px rgba(59, 130, 246, 0.3)" : "none";
+            p2Area.style.boxShadow = (turn === 2) ? "inset 0 0 50px rgba(239, 68, 68, 0.3)" : "none";
+
+            document.getElementById("attack-btn").disabled = isGameOver;
+            document.getElementById("switch-btn").disabled = isGameOver;
+        }
+
+        function renderCard(pId, card) {
+            const el = document.getElementById(pId + "-active-card");
+            const master = MASTER_CARDS.find(function (m) { return m.name === card.name });
+            const hpPercent = (card.H / master.H) * 100;
+
+            el.innerHTML =
+                '<div style="text-align:center; font-weight:bold; font-size:16px;">' + card.name + '</div>' +
+                '<i class="fas ' + card.icon + '" style="font-size:60px; color:' + master.color + '; margin:20px 0; text-shadow:0 0 10px ' + master.color + '"></i>' +
+                '<div class="hp-bar-outer"><div class="hp-bar-inner" style="width:' + hpPercent + '%"></div></div>' +
+                '<div style="font-size:11px; text-align:right;">HP: ' + card.H + ' / ' + master.H + '</div>' +
+                '<div class="stat-display-bl">' +
+                "H: " + card.H + "<br>I: " + card.I + "<br>J: " + card.J + "<br>" +
+                "G: " + card.G + " F: " + card.F + "<br>D: " + card.D + " A: " + card.A +
+                '</div>';
+        }
+
+        function addLog(msg) {
+            const logArea = document.getElementById("log-area");
+            const div = document.createElement("div");
+            div.style.marginBottom = "3px";
+            div.innerText = "> " + msg;
+            logArea.appendChild(div);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        initSetup();
+
+    </script>
+</body>
+
+</html>
