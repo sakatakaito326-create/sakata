@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケ吉おみくじ</title>
+    <style>
+        body {
+            /* 背景は優しく、プクリンらしいピンク色 */
+            background-color: #ffe6f0; 
+            text-align: center;
+            font-family: 'Comic Sans MS', 'Arial', sans-serif;
+            padding-top: 30px;
+            color: #333;
+        }
+
+        h1 {
+            /* タイトルは元気な赤と青で、コライドン・ミライドンをイメージ */
+            color: #4a90e2; 
+            text-shadow: 3px 3px 0 #d00000; 
+            font-size: 3.5em;
+            margin-bottom: 20px;
+        }
+        
+        /* ポケ吉専用の運勢結果の見た目 */
+        .luck-wording {
+            font-size: 2em;
+            font-weight: bold;
+            color: #d00000;
+            margin-bottom: 10px;
+        }
+        
+        /* おみくじ結果の箱 */
+        #result-box {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 550px;
+            margin: 25px auto;
+            padding: 30px;
+            font-size: 1.6em;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 5px solid #ff6f61; /* ポケモンボールの縁取り風 */
+        }
+
+        /* ポケモンの画像 */
+        #pokemon-image {
+            max-width: 180px; /* 画像を少し大きく */
+            height: auto;
+            margin-top: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        /* 大吉のポケモンが当たった時の特別な画像表示 */
+        .dai-kichi-pokemon {
+            max-width: 100%; /* 大吉ポケモンは特別に大きく */
+        }
+        
+        /* ボタン */
+        #draw-button {
+            background-color: #ff5722; /* オレンジ色のボタン */
+            color: white;
+            border-radius: 30px;
+            border: none;
+            font-size: 1.5em;
+            padding: 18px 40px;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            margin-bottom: 25px;
+        }
+
+        #draw-button:hover {
+            background-color: #e64a19;
+            transform: translateY(-3px);
+        }
+        #draw-button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>✨ ポケ吉おみくじ ✨</h1>
+
+    <button id="draw-button" onclick="drawOmikuji()">
+        ポケ吉を引く！
+    </button>
+
+    <div id="result-box">
+        <p>上のボタンを押して、あなたの一日の運勢とパートナーポケモンを見てみよう！</p>
+    </div>
+
+    <script>
+        // ポケモン図鑑（PokeAPI）から画像URLを借りてきています。
+
+        // 1. ポケ吉の「くじ」の中身を用意します。
+        const results = [
+            { 
+                luck: "🎉 大吉 🎉", 
+                message: "最高の一日！伝説のポケモン「ミライドン」と「コライドン」が力をくれるよ！", 
+                pokemonImageUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1008.png", /* ミライドン */
+                secondPokemonUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1007.png"  /* コライドン */
+            },
+            { 
+                luck: "😊 中吉 😊", 
+                message: "良いことがたくさんありそう！プクリンがあなたを応援しているよ！", 
+                pokemonImageUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/40.png" /* プクリン */
+            },
+            { 
+                luck: "🙂 小吉 🙂", 
+                message: "まずまずの運勢だよ。プクリンと一緒に今日も楽しく過ごそう！", 
+                pokemonImageUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/40.png" /* プクリン */
+            },
+            { 
+                luck: "😟 末吉 😟", 
+                message: "少しだけ運が良いよ。プクリンが優しく見守ってくれているよ。", 
+                pokemonImageUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/40.png" /* プクリン */
+            },
+            { 
+                luck: "😥 凶 😥", 
+                message: "今日は慎重にね。プクリンに癒やされて、明日への準備をしよう。", 
+                pokemonImageUrl: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/40.png" /* プクリン */
+            }
+        ];
+
+        // 2. おみくじを引くための関数を作ります。
+        function drawOmikuji() {
+            // 2-1. くじの数（resultsの数）を知ります。ここでは 5 (大吉～凶) です。
+            const maxNumber = results.length;
+
+            // 2-2. 0 から (くじの数 - 1) までのランダムな数字を作ります。
+            const randomIndex = Math.floor(Math.random() * maxNumber);
+
+            // 2-3. ランダムな数字を使って、くじの結果を選びます。
+            const selectedResult = results[randomIndex];
+
+            // 3. 画面に結果を表示する場所（result-box）を探します。
+            const resultBox = document.getElementById('result-box');
+
+            // 4. 表示するHTML（文字と画像）を準備します。
+            let displayHtml = '';
+            
+            // 4-1. 運勢の文字とメッセージを準備します。
+            displayHtml += '<div class="luck-wording">' + selectedResult.luck + '</div>';
+            displayHtml += '<p>' + selectedResult.message + '</p>';
+            
+            // 4-2. ポケモンの画像を準備します。
+            
+            // 大吉（ミライドン・コライドン）の場合
+            if (selectedResult.luck === "🎉 大吉 🎉") {
+                // 大吉は特別な表示にします（コライドンとミライドンの両方）
+                displayHtml += 
+                    '<div style="display: flex; gap: 20px;">' +
+                    // コライドンの画像
+                    '<img id="pokemon-image" class="dai-kichi-pokemon" src="' + selectedResult.secondPokemonUrl + '" alt="コライドン">' +
+                    // ミライドンの画像
+                    '<img id="pokemon-image" class="dai-kichi-pokemon" src="' + selectedResult.pokemonImageUrl + '" alt="ミライドン">' +
+                    '</div>';
+            } 
+            // 大吉以外の運勢（プクリン）の場合
+            else {
+                // プクリンの画像を一つだけ表示します
+                displayHtml += '<img id="pokemon-image" src="' + selectedResult.pokemonImageUrl + '" alt="プクリン">';
+            }
+
+            // 5. resultBoxの中に、準備したHTMLを書き込み、画面に表示します。
+            resultBox.innerHTML = displayHtml;
+        }
+
+        // 6. ページがすべて読み込まれたら、初期メッセージを表示します。
+        function initializeOmikuji() {
+            const resultBox = document.getElementById('result-box');
+            resultBox.innerHTML = '<p>上のボタンを押して、あなたの一日の運勢とパートナーポケモンを見てみよう！</p>';
+        }
+
+        initializeOmikuji();
+
+    </script>
+</body>
+</html>

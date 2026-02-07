@@ -1,0 +1,2354 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ウルトラビースト バトル！</title>
+    <style>
+        /* 
+           デザインのせっていです。
+           かっこいい画面にするために、色や形をきめています。
+        */
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #0d0d2b, #2a0845);
+            /* 宇宙っぽい背景 */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            /* 画面からはみ出さないようにします */
+            color: #fff;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            background: rgba(255, 255, 255, 0.05);
+            /* 少し透けさせる */
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 相手のポケモンの場所 */
+        .pokemon-area {
+            flex: 1;
+            position: relative;
+            padding: 20px;
+        }
+
+        .opponent-area {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+        }
+
+        .player-area {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-end;
+        }
+
+        /* ポケモンの画像 */
+        .pokemon-img {
+            width: 200px;
+            height: 200px;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
+            transition: transform 0.2s, opacity 0.5s;
+        }
+
+        #opponent-sprite {
+            margin-right: 50px;
+            position: absolute;
+            top: 60px;
+            right: 60px;
+            z-index: 2;
+            /* 手前に表示 */
+        }
+
+        #player-sprite {
+            margin-left: 50px;
+            position: absolute;
+            bottom: 60px;
+            left: 60px;
+        }
+
+        /* ウルトラホールの画像（背景） */
+        #wormhole {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            width: 250px;
+            height: 250px;
+            opacity: 0;
+            transition: opacity 1s, transform 5s linear;
+            /* 回転アニメーション用 */
+            z-index: 1;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinning {
+            animation: spin 3s infinite linear;
+        }
+
+        /* ステータス画面（名前やHP） */
+        .status-box {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 15px;
+            min-width: 220px;
+            position: absolute;
+            z-index: 5;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        #opponent-status {
+            top: 20px;
+            left: 20px;
+        }
+
+        #player-status {
+            bottom: 180px;
+            /* コマンド枠の上 */
+            right: 20px;
+        }
+
+        .hp-bar-container {
+            width: 100%;
+            height: 15px;
+            background-color: #555;
+            border-radius: 10px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            overflow: hidden;
+            border: 1px solid #fff;
+        }
+
+        .hp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00b09b, #96c93d);
+            width: 100%;
+            transition: width 0.5s ease-out;
+        }
+
+        /* 下のメッセージとコマンドの枠 */
+        .control-panel {
+            height: 160px;
+            background: rgba(0, 0, 0, 0.85);
+            border-top: 2px solid #444;
+            display: flex;
+            padding: 10px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        #message-box {
+            flex: 2;
+            padding: 15px;
+            font-size: 18px;
+            line-height: 1.6;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            margin-right: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #command-box {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background: linear-gradient(to bottom, #fff, #ddd);
+            border: 2px solid #555;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background: #eee;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            background: #ccc;
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 技選択などのサブメニュー用 */
+        #move-box,
+        #pokemon-box {
+            display: none;
+            /* 最初は隠しておく */
+            flex: 1;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* 技ボタンの中にPPを表示するためのスタイル */
+        .move-btn-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+        }
+
+        .pp-text {
+            font-size: 12px;
+            color: #444;
+        }
+
+        /* アニメーション */
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            10%,
+            30%,
+            50%,
+            70%,
+            90% {
+                transform: translate(-10px, 0);
+            }
+
+            20%,
+            40%,
+            60%,
+            80% {
+                transform: translate(10px, 0);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        /* 登場アニメーション */
+        .appear-from-wormhole {
+            animation: appear 2s forwards;
+        }
+
+        @keyframes appear {
+            0% {
+                transform: scale(0) rotate(180deg);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        /* 技のエフェクト（簡易） */
+        .effect-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .flash-anim {
+            animation: flash 0.2s;
+        }
+
+        @keyframes flash {
+            0% {
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* 水手裏剣エフェクト */
+        .shuriken {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: cyan;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .throw-shuriken {
+            animation: throwShuriken 0.5s forwards;
+        }
+
+        @keyframes throwShuriken {
+            0% {
+                opacity: 1;
+                left: 20%;
+                bottom: 20%;
+                transform: rotate(0deg);
+            }
+
+            100% {
+                opacity: 0;
+                left: 80%;
+                top: 20%;
+                transform: rotate(720deg);
+            }
+        }
+
+        /* 捕まえる演出用 */
+        .ball {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(to bottom, #f00 50%, #fff 50%);
+            border-radius: 50%;
+            border: 2px solid #000;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .ball::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #000;
+            transform: translateY(-50%);
+        }
+
+        .ball::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .ball-throw {
+            animation: throwArc 1s forwards ease-out;
+        }
+
+        @keyframes throwArc {
+            0% {
+                left: 10%;
+                bottom: 10%;
+                transform: rotate(0deg) scale(1);
+            }
+
+            50% {
+                left: 45%;
+                bottom: 60%;
+                transform: rotate(360deg) scale(1.2);
+            }
+
+            100% {
+                left: 80%;
+                top: 15%;
+                transform: rotate(720deg) scale(1);
+            }
+        }
+
+        .ball-shake {
+            animation: ballShake 0.5s repeat(3);
+        }
+
+        @keyframes ballShake {
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            25% {
+                transform: rotate(-20deg);
+            }
+
+            75% {
+                transform: rotate(20deg);
+            }
+        }
+
+        /* 捕獲時の光の吸収 */
+        .absorbed {
+            animation: absorbAnim 0.5s forwards;
+        }
+
+        @keyframes absorbAnim {
+            0% {
+                filter: brightness(2) white;
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.1);
+                opacity: 0;
+            }
+        }
+
+        /* ゲームオーバー画面 */
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        #game-over-text {
+            font-size: 40px;
+            color: red;
+            margin-bottom: 20px;
+        }
+
+        .restart-btn {
+            padding: 10px 30px;
+            font-size: 20px;
+            background: white;
+            color: black;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* 攻撃時の動き */
+        .attack-player {
+            animation: attackPlayer 0.3s;
+        }
+
+        @keyframes attackPlayer {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(30px, -30px) scale(1.1);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        .attack-opponent {
+            animation: attackOpponent 0.3s;
+        }
+
+        @keyframes attackOpponent {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(-30px, 30px) scale(1.1);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        /* 変身アニメーション */
+        .transform-anim {
+            animation: transformEffect 2s;
+        }
+
+        @keyframes transformEffect {
+            0% {
+                filter: brightness(1) hue-rotate(0deg);
+                transform: scale(1);
+            }
+
+            25% {
+                filter: brightness(100) hue-rotate(90deg);
+                transform: scale(0.1) rotate(180deg);
+            }
+
+            50% {
+                filter: brightness(100) hue-rotate(180deg);
+                transform: scale(1.5) rotate(720deg);
+            }
+
+            75% {
+                filter: brightness(50) hue-rotate(270deg);
+                transform: scale(1.2) rotate(1080deg);
+            }
+
+            100% {
+                filter: brightness(1) hue-rotate(0deg);
+                transform: scale(1);
+            }
+        }
+
+        /* コアパニッシャー用: 飛び上がる */
+        .jump-up {
+            animation: jumpUp 1s forwards ease-in-out;
+        }
+
+        @keyframes jumpUp {
+            0% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-300px) scale(0.5);
+            }
+
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        /* Zを描くアニメーション */
+        .z-line {
+            position: absolute;
+            background: #0f0;
+            box-shadow: 0 0 15px #0f0;
+            z-index: 50;
+            opacity: 0;
+        }
+
+        .z-draw-1 {
+            animation: drawLine 0.2s forwards;
+        }
+
+        .z-draw-2 {
+            animation: drawLine 0.2s 0.2s forwards;
+        }
+
+        .z-draw-3 {
+            animation: drawLine 0.2s 0.4s forwards;
+        }
+
+        @keyframes drawLine {
+            from {
+                opacity: 0;
+                transform: scaleX(0);
+            }
+
+            to {
+                opacity: 1;
+                transform: scaleX(1);
+            }
+        }
+
+        /* だんがいのつるぎ用: でかい岩 */
+        .giant-rock {
+            position: absolute;
+            width: 150px;
+            height: 250px;
+            background: #5c4033;
+            /* 濃い茶色 */
+            border: 4px solid #222;
+            left: 70%;
+            /* 相手の足元付近 */
+            bottom: -250px;
+            /* 下に隠しておく */
+            z-index: 15;
+            clip-path: polygon(10% 100%, 20% 60%, 50% 0%, 80% 60%, 90% 100%);
+            animation: rockBurst 0.6s forwards ease-out;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        @keyframes rockBurst {
+            0% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-350px);
+                opacity: 1;
+            }
+        }
+
+        /* 石のディテール用（テクスチャ感） */
+        .giant-rock::before {
+            content: "";
+            position: absolute;
+            top: 10%;
+            left: 20%;
+            width: 10px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.2);
+            transform: rotate(10deg);
+        }
+
+        .giant-rock::after {
+            content: "";
+            position: absolute;
+            top: 30%;
+            right: 10%;
+            width: 15px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            transform: rotate(-15deg);
+        }
+
+        /* メガシンカ */
+        .mega-evolve-anim {
+            animation: megaEffect 1.5s forwards;
+        }
+
+        @keyframes megaEffect {
+            0% {
+                filter: brightness(1) contrast(1);
+                transform: scale(1);
+            }
+
+            50% {
+                filter: brightness(5) contrast(2) hue-rotate(180deg);
+                transform: scale(1.3);
+            }
+
+            100% {
+                filter: brightness(1) contrast(1);
+                transform: scale(1.1);
+            }
+        }
+
+        /* 隕石アニメーション */
+        .meteorite {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle at 30% 30%, #ff8c00, #ff4500, #8b0000);
+            border-radius: 50%;
+            box-shadow: 0 0 30px #ff4500, 0 0 60px #ff4500;
+            z-index: 200;
+            top: -100px;
+            right: -100px;
+        }
+
+        .meteorite-fall {
+            animation: fallMeteorite 1.2s forwards linear;
+        }
+
+        @keyframes fallMeteorite {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(-500px, 500px);
+            }
+        }
+
+        .explosion-circle {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, #fff 5%, #ffff00 20%, #ff4500 50%, transparent 70%);
+            border-radius: 50%;
+            z-index: 210;
+            transform: scale(0);
+            pointer-events: none;
+            left: 30%;
+            top: 15%;
+        }
+
+        .explode-anim {
+            animation: explodeEffect 1.5s forwards;
+        }
+
+        @keyframes explodeEffect {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+
+            40% {
+                transform: scale(2.5);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(3.5);
+                opacity: 0;
+            }
+        }
+
+        /* 水の竜巻アニメーション */
+        .water-tornado {
+            position: absolute;
+            width: 80px;
+            height: 300px;
+            background: linear-gradient(to top, rgba(0, 191, 255, 0.8), rgba(255, 255, 255, 0.3));
+            border-radius: 50% 50% 20% 20%;
+            z-index: 20;
+            left: 75%;
+            bottom: 0px;
+            opacity: 0;
+            filter: blur(5px);
+            animation: tornadoRise 1s forwards ease-in-out;
+        }
+
+        @keyframes tornadoRise {
+            0% {
+                transform: translateY(300px) scaleX(0.5) rotate(0deg);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-100px) scaleX(1.5) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* 水と石の剣 */
+        .water-sword {
+            position: absolute;
+            width: 20px;
+            height: 150px;
+            background: cyan;
+            box-shadow: 0 0 20px cyan;
+            z-index: 30;
+            left: 80%;
+            top: 10%;
+            opacity: 0;
+            transform-origin: center;
+        }
+
+        .slash-anim {
+            animation: slashEffect 0.5s forwards ease-out;
+        }
+
+        @keyframes slashEffect {
+            0% {
+                transform: translate(50px, -50px) rotate(45deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-100px, 100px) rotate(45deg);
+                opacity: 0;
+            }
+        }
+
+        /* シャドードライブ用: 反転世界 */
+        #reverse-world-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(75, 0, 130, 0);
+            z-index: 150;
+            pointer-events: none;
+            transition: background 0.5s;
+        }
+
+        .shadow-slash {
+            position: absolute;
+            width: 100px;
+            height: 10px;
+            background: #fff;
+            box-shadow: 0 0 10px #4b0082;
+            opacity: 0;
+            z-index: 151;
+        }
+
+        /* メテオレイ用: 属性パワー */
+        .power-orb {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            z-index: 160;
+            filter: blur(5px);
+            opacity: 0;
+        }
+
+        .beam-sword {
+            position: absolute;
+            width: 10px;
+            height: 400px;
+            background: linear-gradient(to bottom, #fff, #ffff00, #ff8c00);
+            box-shadow: 0 0 30px #ffff00;
+            z-index: 161;
+            opacity: 0;
+            top: -200px;
+            left: 80%;
+            transform: rotate(20deg);
+        }
+
+        /* ウルトラホールに吸い込まれるアニメーション */
+        .suction-anim {
+            animation: suction 2s forwards ease-in;
+        }
+
+        @keyframes suction {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(50px, -100px) scale(0) rotate(1080deg);
+                opacity: 0;
+            }
+        }
+
+        /* サンシャインスマッシャー用 */
+        .sun-ball {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, #fff, #ffdf00, #ff8c00);
+            border-radius: 50%;
+            box-shadow: 0 0 50px #ff8c00;
+            z-index: 200;
+            opacity: 0;
+        }
+
+        .sun-crash {
+            animation: sunCrash 1s forwards ease-in;
+        }
+
+        @keyframes sunCrash {
+            0% {
+                transform: translate(0, -300px) scale(0.5);
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 1;
+                transform: translate(0, -250px) scale(1.5);
+            }
+
+            100% {
+                transform: translate(150px, 150px) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* ムーンライトブラスター用 */
+        .moon-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 50, 0.8);
+            z-index: 190;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .full-moon {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #fff, #e6e6fa, #483d8b);
+            border-radius: 50%;
+            box-shadow: 0 0 40px #e6e6fa;
+            position: absolute;
+            top: 10%;
+            opacity: 0;
+        }
+
+        .moon-beam {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            box-shadow: 0 0 20px cyan, 0 0 40px blue;
+            z-index: 200;
+            border-radius: 50%;
+            opacity: 0;
+        }
+
+        .beam-fire {
+            animation: beamFire 0.5s forwards linear;
+        }
+
+        @keyframes beamFire {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(20, 1);
+                opacity: 0;
+            }
+        }
+
+        /* 技の説明ボックス */
+        #move-info {
+            position: absolute;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #aaa;
+            font-size: 14px;
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .move-info-title {
+            font-weight: bold;
+            color: #ffff00;
+            margin-bottom: 4px;
+        }
+
+        /* スタート画面 */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        #start-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <!-- スタートボタン -->
+        <div id="start-overlay">
+            <h1 style="color:#fff; margin-bottom: 30px;">ウルトラネクロズマ 襲来！</h1>
+            <button id="start-btn" onclick="initGame()">バトル開始！</button>
+        </div>
+
+        <!-- ウルトラホール（背景） -->
+        <img id="wormhole" src="wormhole.png" alt="ウルトラホール">
+
+        <!-- 相手（マッシブーン）のエリア -->
+        <div class="pokemon-area opponent-area">
+            <div id="opponent-status" class="status-box">
+                <div id="opponent-name">大将 マッシブーン Lv.50</div>
+                <div class="hp-bar-container">
+                    <div id="opponent-hp-bar" class="hp-bar"></div>
+                </div>
+                <div id="opponent-hp-text">HP: 200/200</div>
+            </div>
+            <img id="opponent-sprite" class="pokemon-img" src="buzzwole.png" alt="マッシブーン">
+        </div>
+
+        <!-- 自分（ジガルデ）のエリア -->
+        <div class="pokemon-area player-area">
+            <img id="player-sprite" class="pokemon-img"
+                src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10118.png"
+                alt="ジガルデ">
+            <img id="player-sprite-2" class="pokemon-img"
+                style="display:none; width: 180px; height: 180px; margin-left: -50px;" alt="カイオーガ">
+            <div id="player-status" class="status-box">
+                <div id="player-name">ジガルデ（１０％） Lv.50</div>
+                <div class="hp-bar-container">
+                    <div id="player-hp-bar" class="hp-bar"></div>
+                </div>
+                <div id="player-hp-text">HP: 100/100</div>
+            </div>
+        </div>
+
+        <!-- エフェクト用レイヤー -->
+        <div id="effect-layer" class="effect-flash"></div>
+        <div id="shuriken-layer"></div>
+        <div id="reverse-world-layer"></div>
+
+        <!-- 下のパネル -->
+        <div class="control-panel">
+            <!-- 技の詳細説明が表示される場所 -->
+            <div id="move-info">
+                <div class="move-info-title" id="info-name">わざの名前</div>
+                <div id="info-desc">説明がここに入ります</div>
+            </div>
+
+            <div id="message-box">
+                ……！<br>
+                空に ウルトラホールが 開いた！
+            </div>
+
+            <!-- 最初のアクション選択 -->
+            <div id="command-box" style="display:none;"> <!-- 最初は隠しておく -->
+                <button onclick="showMoves()">たたかう</button>
+                <button onclick="tryCatch()">つかまえる</button>
+                <button onclick="showSwitch()">ポケモン</button>
+                <button onclick="runAway()">にげる</button>
+            </div>
+
+            <!-- 技を選ぶ画面 -->
+            <div id="move-box">
+                <button id="move1-btn" onclick="useMove(0)"></button>
+                <button id="move2-btn" onclick="useMove(1)"></button>
+                <button id="move3-btn" onclick="useMove(2)"></button>
+                <button id="move4-btn" onclick="useMove(3)"></button>
+                <button onclick="backToCommand()" style="background: #ffcccc;">もどる</button>
+            </div>
+
+            <div id="pokemon-box">
+                <button onclick="switchPokemon(0)">ジガルデ</button>
+                <button onclick="switchPokemon(1)">ソルガレオ</button>
+                <button onclick="switchPokemon(2)">ゲンシグラードン</button>
+                <button onclick="switchPokemon(3)">レックウザ</button>
+                <button id="deoxys-switch-btn" onclick="switchPokemon(4)" style="display:none;">デオキシス</button>
+                <button id="lunala-switch-btn" onclick="switchPokemon(5)" style="display:none;">ルナアーラ</button>
+                <button id="fusion-switch-btn" onclick="switchPokemon(6)" style="display:none;">ソルガレオ＆ルナアーラ</button>
+                <button onclick="backToCommand()" style="background: #ffcccc;">もどる</button>
+            </div>
+        </div>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="game-over-screen">
+            <div id="game-over-text">GAME OVER</div>
+            <button class="restart-btn" onclick="window.location.reload()">もういちど</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ポケモンの データをつくる クラス
+        // ==========================================
+        class Pokemon {
+            constructor(name, maxHp, moves, ability, item, imgFile, stats = {}) {
+                this.name = name;           // 名前
+                this.maxHp = maxHp;         // 最大HP
+                this.currentHp = maxHp;     // 今のHP
+                this.moves = moves;         // 覚えている技のリスト
+                this.ability = ability;     // 特性
+                this.item = item;           // 持ち物
+                this.imgFile = imgFile;     // 画像ファイル名
+                this.stats = stats;         // 種族値など
+            }
+        }
+
+        // ==========================================
+        // 技（わざ）の データをつくる クラス
+        // ==========================================
+        class Move {
+            constructor(name, power, type, maxPp, desc) {
+                this.name = name;   // 技の名前
+                this.power = power; // 技の威力
+                this.type = type;   // 技のタイプ
+                this.maxPp = maxPp; // 最大PP
+                this.pp = maxPp;    // 今のPP
+                this.desc = desc;   // 技の説明
+            }
+        }
+
+        // ==========================================
+        // データを よういします
+        // ==========================================
+
+        // 1. ソルガレオ
+        let solgaleoMoves = [
+            new Move("サンシャインスマッシャー", 200, "はがね", 1, "ソルガレオの全力、太陽を喰らうＺワザ！"),
+            new Move("メテオドライブ", 100, "はがね", 5, "相手の特性を無視して攻撃するぞ！"),
+            new Move("アイアンヘッド", 80, "はがね", 15, "相手をひるませることがある重い一撃！"),
+            new Move("サイコファング", 85, "エスパー", 10, "鋭い牙で光の壁などを壊して攻撃！")
+        ];
+        let solgaleo = new Pokemon("ソルガレオ", 137, solgaleoMoves, "メタルプロテクト", "じゃくてんほけん", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/791.png");
+
+        // 2. ゲンシグラードン
+        let primalGroudonMoves = [
+            new Move("だんがいのつるぎ", 120, "じめん", 10, "地面から鋭い岩を突き出して攻撃する！"),
+            new Move("ほのおのパンチ", 75, "ほのお", 15, "炎をまとったパンチ！火傷させるかも？"),
+            new Move("がんせきふうじ", 60, "いわ", 15, "岩で動きを封じて素早さを下げるぞ！"),
+            new Move("つるぎのまい", 0, "ノーマル", 20, "戦いのダンスで攻撃力をグーンと上げる！")
+        ];
+        let primalGroudon = new Pokemon("ゲンシグラードン", 150, primalGroudonMoves, "おわりのだいち", "べにいろのたま", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10078.png");
+
+        // 2-2. ゲンシグラードン＆ゲンシカイオーガ（合体）
+        let primalFusionMoves = [
+            new Move("だんがいのはどう", 150, "じめん", 5, "岩と水の竜巻で攻撃する究極の共鳴技！"),
+            new Move("こんげんのつるぎ", 150, "みず", 5, "敵を拘束し、水と石の剣で斬り伏せる！"),
+            new Move("じしん", 100, "じめん", 10, "大地を震わせて大ダメージを与えるぞ！"),
+            new Move("だくりゅう", 90, "みず", 10, "濁った激流で命中率を下げることもある！")
+        ];
+        let primalFusionStats = { def: 170, spd: 170 };
+        let primalFusion = new Pokemon("ゲンシグラードン＆ゲンシカイオーガ", 750, primalFusionMoves, "はじまりのうみ", "べにいろのたま", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10078.png", primalFusionStats);
+
+        // 3. ジガルデ（各フォルム）
+        let zygarde10Moves = [
+            new Move("しんそく", 80, "ノーマル", 5, "目にも留まらぬ速さで先制攻撃するぞ！"),
+            new Move("サウザンアロー", 90, "じめん", 10, "空にいる相手も地面に叩き落として攻撃！"),
+            new Move("かみくだく", 80, "あく", 15, "鋭い牙で防御を下げることがあるぞ！"),
+            new Move("こうそくいどう", 0, "エスパー", 20, "体を軽くして素早さを一気に上げるぞ！")
+        ];
+        let zygarde10 = new Pokemon("ジガルデ（１０％）", 100, zygarde10Moves, "スワームチェンジ", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10118.png");
+
+        let zygarde50Moves = [
+            new Move("グランドフォース", 90, "じめん", 10, "地面から衝撃波を出して攻撃するぞ！"),
+            new Move("サウザンアロー", 90, "じめん", 10, "空飛ぶ敵も撃ち落とす不思議な矢！"),
+            new Move("サウザンウェーブ", 90, "じめん", 10, "逃げられないように波で包み込むぞ！"),
+            new Move("りゅうのはどう", 85, "ドラゴン", 10, "口から衝撃波を出して攻撃するぞ！")
+        ];
+        let zygarde50 = new Pokemon("ジガルデ（５０％）", 150, zygarde50Moves, "スワームチェンジ", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/718.png");
+
+        let zygardeCompleteMoves = [
+            new Move("コアパニッシャー", 100, "ドラゴン", 10, "Ｚの文字を刻んで大爆発を起こす究極技！"),
+            new Move("サウザンアロー", 90, "じめん", 10, "万能な地面タイプの攻撃ワザ！"),
+            new Move("サウザンウェーブ", 90, "じめん", 10, "相手の逃げ道を完全にふさぐ攻撃！"),
+            new Move("グランドフォース", 90, "じめん", 10, "大地を揺るがす強力な全体攻撃だ！")
+        ];
+        let zygardeComplete = new Pokemon("ジガルデ（パーフェクト）", 216, zygardeCompleteMoves, "スワームチェンジ", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10120.png");
+
+        // 4. レックウザ
+        let rayquazaMoves = [
+            new Move("ガリョウテンセイ", 120, "ひこう", 5, "メガシンカの鍵となる超強力な突撃ワザ！"),
+            new Move("しんそく", 80, "ノーマル", 5, "相手より早く動ける凄まじいスピード！"),
+            new Move("じしん", 100, "じめん", 10, "巨大な体で着地して地震を起こすぞ！"),
+            new Move("りゅうのまい", 0, "ドラゴン", 20, "攻撃と素早さを同時に高める神秘の舞！")
+        ];
+        let rayquaza = new Pokemon("レックウザ", 105, rayquazaMoves, "エアロック", "きあいのタスキ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png");
+        rayquaza.canMega = true;
+        rayquaza.isMega = false;
+
+        // 8. デオキシス（各フォルム）
+        // ノーマル
+        let deoxysNormalMoves = [
+            new Move("サイコブースト", 140, "エスパー", 5, "宇宙のパワーで攻撃！自分の特攻が下がる。"),
+            new Move("しんそく", 80, "ノーマル", 5, "素早い突進攻撃。相手より先に動けるぞ！"),
+            new Move("ばかぢから", 120, "かくとう", 5, "全力の力！自分の攻撃と防御が下がるぞ。"),
+            new Move("れいとうビーム", 90, "こおり", 10, "凍てつく光線！相手を氷にすることがあるぞ。")
+        ];
+        let deoxysNormal = new Pokemon("デオキシス", 150, deoxysNormalMoves, "プレッシャー", "いのちのたま", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/386.png");
+
+        // アタック
+        let deoxysAttackMoves = [
+            new Move("サイコブースト", 140, "エスパー", 5, "攻撃特化！凄まじい破壊力の超能力技。"),
+            new Move("ばかぢから", 120, "かくとう", 5, "全力を込めた一撃！破壊力は抜群。"),
+            new Move("あくのはどう", 80, "あく", 15, "悪意に満ちたオーラで攻撃！"),
+            new Move("しんそく", 80, "ノーマル", 5, "光のような速さで突撃する！")
+        ];
+        let deoxysAttack = new Pokemon("デオキシス（アタック）", 100, deoxysAttackMoves, "プレッシャー", "きあいのタスキ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10001.png");
+
+        // ディフェンス
+        let deoxysDefenseMoves = [
+            new Move("サイコブースト", 140, "エスパー", 5, "防御フォルムでも放つ最強の超能力技！"),
+            new Move("じこさいせい", 0, "ノーマル", 10, "細胞を再生してHPを半分回復するぞ。"),
+            new Move("ミラーコート", 0, "エスパー", 10, "受けた特殊攻撃を倍にして跳ね返す！"),
+            new Move("どくどく", 0, "どく", 10, "相手を猛毒の状態にするぞ。")
+        ];
+        let deoxysDefense = new Pokemon("デオキシス（ディフェンス）", 300, deoxysDefenseMoves, "プレッシャー", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10002.png");
+
+        // スピード
+        let deoxysSpeedMoves = [
+            new Move("サイコブースト", 140, "エスパー", 5, "超高速から放たれる最強のサイコパワー！"),
+            new Move("しんそく", 80, "ノーマル", 5, "誰よりも早く動ける究極の先制技！"),
+            new Move("こうそくいどう", 0, "エスパー", 20, "さらにスピードを高めて回避不能に！"),
+            new Move("ドレインパンチ", 75, "かくとう", 10, "攻撃しながら相手の体力を吸収するぞ！")
+        ];
+        let deoxysSpeed = new Pokemon("デオキシス（スピード）", 150, deoxysSpeedMoves, "プレッシャー", "ピントレンズ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10003.png");
+
+
+
+        // 5. ウルトラネクロズマ（相手）
+        let ultraNecrozmaMoves = [
+            new Move("フォトンゲイザー", 100, "エスパー", 5, ""),
+            new Move("プリズムレーザー", 160, "エスパー", 5, ""),
+            new Move("りゅうのはどう", 85, "ドラゴン", 10, ""),
+            new Move("パワージェム", 80, "いわ", 20, "")
+        ];
+        let ultraNecrozmaStats = { atk: 120, spa: 120, def: 150, spd: 150 };
+        let ultraNecrozma = new Pokemon("ウルトラネクロズマ", 3700, ultraNecrozmaMoves, "ブレインフォース", "ウルトラネクロZ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10157.png", ultraNecrozmaStats);
+
+        // 6. ネクロズマ（通常・第1形態）
+        let necrozmaMoves = [
+            new Move("プリズムレーザー", 160, "エスパー", 5, ""),
+            new Move("サイコカッター", 70, "エスパー", 15, ""),
+            new Move("ラスターカノン", 80, "はがね", 10, ""),
+            new Move("パワージェム", 80, "いわ", 20, "")
+        ];
+        let necrozma = new Pokemon("ネクロズマ", 194, necrozmaMoves, "プリズムアーマー", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/800.png");
+
+        // 7. ネクロズマ（あかつきのつばさ・第2形態）
+        let dawnWingsMoves = [
+            new Move("シャドーレイ", 100, "ゴースト", 5, ""),
+            new Move("フォトンゲイザー", 100, "エスパー", 5, ""),
+            new Move("ラスターカノン", 80, "はがね", 10, ""),
+            new Move("サイコショック", 80, "エスパー", 10, "")
+        ];
+        let dawnWingsNecrozma = new Pokemon("ネクロズマ（あかつきのつばさ）", 194, dawnWingsMoves, "プリズムアーマー", "たべのこし", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10156.png");
+
+        // 9. ルナアーラ
+        let lunalaMoves = [
+            new Move("ムーンライトブラスター", 200, "ゴースト", 1, "ルナアーラの全力、月を誘うＺワザ！"),
+            new Move("シャドーレイ", 100, "ゴースト", 5, "不気味な光線を放つ！相手の特性を無視するぞ。"),
+            new Move("ムーンフォース", 95, "フェアリー", 15, "月の力を借りて攻撃！特攻を下げることも。"),
+            new Move("はねやすめ", 0, "ひこう", 10, "翼を休めて自分のHPを半分回復するぞ。")
+        ];
+        let lunala = new Pokemon("ルナアーラ", 137, lunalaMoves, "ファントムガード", "ルナアーラZ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/792.png");
+
+        // 10. ソルガレオ＆ルナアーラ（合体）
+        // HP850, D190, 特防190
+        // 10. ソルガレオ＆ルナアーラ（合体）
+        // HP850, D190, 特防190
+        let solgaleoLunalaMoves = [
+            new Move("サンシャインスマッシャー", 200, "はがね", 1, "太陽の如き灼熱で敵を粉砕する究極Ｚワザ！"),
+            new Move("ムーンライトブラスター", 200, "ゴースト", 1, "月の光を収束させ全てを消し去る究極Ｚワザ！"),
+            new Move("シャドードライブ", 150, "ゴースト", 5, "反転世界から全方位攻撃する異次元の技！"),
+            new Move("メテオレイ", 170, "はがね", 5, "全宇宙のパワーを込めた光輝く剣で斬り裂く！")
+        ];
+        let solgaleoLunalaStats = { def: 190, spd: 190 };
+        let solgaleoLunala = new Pokemon("ソルガレオ＆ルナアーラ", 850, solgaleoLunalaMoves, "プリズムアーマー", "ウルトラネクロZ", "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/791.png", solgaleoLunalaStats);
+
+        let myParty = [zygarde10, solgaleo, primalGroudon, rayquaza];
+        let myPokemonIndex = 0;
+
+        let activePlayer = myParty[myPokemonIndex];
+        let activeOpponent = necrozma; // Start with Normal form
+        let turn = 0;
+
+        // ==========================================
+        // ゲームの はじまり（演出）
+        // ==========================================
+        async function startIntro() {
+            // 相手を最初は隠す
+            let oppSprite = document.getElementById("opponent-sprite");
+            oppSprite.style.opacity = "0";
+
+            // ウルトラホールをだす
+            let wormhole = document.getElementById("wormhole");
+            wormhole.style.opacity = "1";
+            wormhole.classList.add("spinning");
+
+            await wait(2000);
+
+            showMessage("ウルトラホールから 不気味な 黒い影が……");
+            playBGM(); // ここでBGM開始
+            await wait(2000);
+
+            // 登場（通常ネクロズマ）
+            oppSprite.style.opacity = "1";
+            oppSprite.classList.add("appear-from-wormhole");
+
+            await wait(2000);
+
+            showMessage("伝説のポケモン ネクロズマが 現れた！");
+            await wait(2000);
+
+            wormhole.style.opacity = "0"; // ホールは消える
+            showMessage(activePlayer.name + "は どうする？");
+            document.getElementById("command-box").style.display = "grid"; // コマンド表示
+        }
+
+        // ==========================================
+        // 画面 更新
+        // ==========================================
+        function updateUI() {
+            // 自分
+            document.getElementById("player-name").innerText = activePlayer.name;
+            document.getElementById("player-hp-text").innerText = "HP: " + activePlayer.currentHp + "/" + activePlayer.maxHp;
+            let playerHpPercent = (activePlayer.currentHp / activePlayer.maxHp) * 100;
+            document.getElementById("player-hp-bar").style.width = playerHpPercent + "%";
+            let pSprite = document.getElementById("player-sprite");
+            let pSprite2 = document.getElementById("player-sprite-2");
+
+            if (activePlayer.name === "ゲンシグラードン＆ゲンシカイオーガ") {
+                pSprite.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10078.png"; // グラードン
+                pSprite2.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10077.png"; // カイオーガ
+                pSprite2.style.display = "block";
+            } else if (activePlayer.name === "ソルガレオ＆ルナアーラ") {
+                pSprite.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/791.png"; // ソルガレオ
+                pSprite2.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/792.png"; // ルナアーラ
+                pSprite2.style.display = "block";
+            } else {
+                pSprite.src = activePlayer.imgFile;
+                pSprite2.style.display = "none";
+            }
+
+            changeBarColor("player-hp-bar", playerHpPercent);
+
+            // 相手
+            document.getElementById("opponent-name").innerText = activeOpponent.name;
+            document.getElementById("opponent-hp-text").innerText = "HP: " + activeOpponent.currentHp + "/" + activeOpponent.maxHp;
+            let opponentHpPercent = (activeOpponent.currentHp / activeOpponent.maxHp) * 100;
+            document.getElementById("opponent-hp-bar").style.width = opponentHpPercent + "%";
+            document.getElementById("opponent-sprite").src = activeOpponent.imgFile;
+            changeBarColor("opponent-hp-bar", opponentHpPercent);
+
+            // 技ボタンの更新（PPも表示）
+            let buttons = [
+                document.getElementById("move1-btn"),
+                document.getElementById("move2-btn"),
+                document.getElementById("move3-btn"),
+                document.getElementById("move4-btn")
+            ];
+            for (let i = 0; i < 4; i++) {
+                let move = activePlayer.moves[i];
+                if (move) {
+                    // 名前とPPを表示
+                    buttons[i].innerHTML = `
+                    <div class="move-btn-text">
+                        <span>${move.name}</span>
+                        <span class="pp-text">PP ${move.pp}/${move.maxPp}</span>
+                    </div>
+                `;
+                    // 説明表示イベントを追加
+                    buttons[i].onmouseover = function () { showMoveInfo(move.name, move.power, move.desc); };
+                    buttons[i].onmouseout = function () { hideMoveInfo(); };
+
+                    // PPが0なら押せない
+                    if (move.pp <= 0) {
+                        buttons[i].disabled = true;
+                        buttons[i].style.opacity = "0.6";
+                    } else {
+                        buttons[i].disabled = false;
+                        buttons[i].style.opacity = "1";
+                    }
+                } else {
+                    buttons[i].innerText = "-";
+                    buttons[i].disabled = true;
+                }
+            }
+        }
+
+        function changeBarColor(id, percent) {
+            let bar = document.getElementById(id);
+            if (percent > 50) {
+                bar.style.background = "linear-gradient(90deg, #00b09b, #96c93d)";
+            } else if (percent > 20) {
+                bar.style.background = "linear-gradient(90deg, #f12711, #f5af19)";
+            } else {
+                bar.style.background = "linear-gradient(90deg, #ed213a, #93291e)";
+            }
+        }
+
+        function showMessage(text) {
+            document.getElementById("message-box").innerHTML = text;
+        }
+
+        // --- 技の説明表示用 ---
+        function showMoveInfo(name, power, desc) {
+            let box = document.getElementById("move-info");
+            let powerText = power > 0 ? ` (威力: ${power})` : "";
+            document.getElementById("info-name").innerText = name + powerText;
+            document.getElementById("info-desc").innerText = desc || "この技には説明がありません。";
+            box.style.display = "block";
+        }
+
+        function hideMoveInfo() {
+            document.getElementById("move-info").style.display = "none";
+        }
+
+        // ==========================================
+        // メニュー操作
+        // ==========================================
+        function showMoves() {
+            document.getElementById("command-box").style.display = "none";
+            document.getElementById("move-box").style.display = "grid";
+            updateUI(); // PPの状態を確認するために更新
+            showMessage("どの 技を だす？");
+        }
+
+        function showSwitch(isForced) {
+            document.getElementById("command-box").style.display = "none";
+            document.getElementById("pokemon-box").style.display = "grid";
+
+            // 交代ボタンの表示更新（ひんしの場合など）
+            let btns = document.getElementById("pokemon-box").getElementsByTagName("button");
+
+            // ボタンの状態更新（自分の手持ち数に合わせてループ）
+            for (let i = 0; i < myParty.length; i++) {
+                if (myParty[i].currentHp <= 0) {
+                    btns[i].disabled = true;
+                    btns[i].style.opacity = "0.6";
+                } else {
+                    btns[i].disabled = false;
+                    btns[i].style.opacity = "1";
+                }
+            }
+
+            // もどるボタン（最後のボタン）
+            let backBtn = btns[btns.length - 1]; // "もどる"ボタン
+
+            if (isForced) {
+                // 強制交代のときは、もどるボタンを隠す
+                backBtn.style.display = "none";
+                showMessage("つぎの ポケモンを えらんで！");
+            } else {
+                backBtn.style.display = "block";
+                showMessage("どの ポケモンに 交代する？");
+            }
+        }
+
+        function backToCommand() {
+            document.getElementById("command-box").style.display = "grid";
+            document.getElementById("move-box").style.display = "none";
+            document.getElementById("pokemon-box").style.display = "none";
+            showMessage(activePlayer.name + "は どうする？");
+        }
+
+        // ==========================================
+        // バトル処理（プレイヤーの攻撃）
+        // ==========================================
+        async function useMove(moveIndex) {
+            let move = activePlayer.moves[moveIndex];
+
+            // PPをへらす
+            move.pp -= 1;
+            updateUI();
+
+            document.getElementById("move-box").style.display = "none";
+            showMessage(activePlayer.name + " の " + move.name + "！");
+            await wait(500);
+
+            // 攻撃モーション
+            let pSprite = document.getElementById("player-sprite");
+            pSprite.classList.remove("attack-player");
+            void pSprite.offsetWidth;
+            pSprite.classList.add("attack-player");
+            await wait(300);
+
+            // 攻撃回数をきめる
+            let hits = 1;
+            if (move.name === "みずしゅりけん" || move.name === "おうふくビンタ") {
+                // 2〜5回当たる（ランダム）
+                // Math.random() は 0〜1未満。
+                // 0-0.33: 2回, 0.33-0.66: 3回, 0.66-0.85: 4回, 0.85-1.0: 5回 くらいの確率
+                let r = Math.random();
+                if (r < 0.33) hits = 2;
+                else if (r < 0.66) hits = 3;
+                else if (r < 0.85) hits = 4;
+                else hits = 5;
+            }
+
+            // 攻撃ループ
+            let totalDamage = 0;
+            for (let i = 0; i < hits; i++) {
+                if (activeOpponent.currentHp <= 0) break; // 相手が倒れたら中断
+
+                // 合体チェック
+                if (activePlayer.name === "ゲンシグラードン" && move.name === "だんがいのつるぎ") {
+                    showMessage("ゲンシカイオーガが 現れた！");
+                    playSE("mega");
+                    await wait(1000);
+                    showMessage("二体の 原始の力が 共鳴する……！");
+                    await wait(1000);
+                    activePlayer = primalFusion;
+                    myParty[myPokemonIndex] = primalFusion;
+                    updateUI();
+                    showMessage("ゲンシグラードン＆ゲンシカイオーガ 合体！");
+                    await wait(2000);
+
+                    // すぐに合体後の技に切り替えて攻撃
+                    move = activePlayer.moves[0]; // だんがいのはどう
+                    showMessage(activePlayer.name + " の " + move.name + "！");
+                    await wait(500);
+                }
+
+                // 変化技のチェック
+                if (move.power === 0) {
+                    if (move.name === "ひかりのかべ") {
+                        showMessage("ひかりのかべを はった！");
+                        flashEffect();
+                    } else if (move.name === "みがわり") {
+                        showMessage("みがわりを 出した！");
+                        flashEffect();
+                    }
+                    await wait(1000);
+                    break; // ループしない
+                }
+
+                // メガシンカチェック
+                if (activePlayer.name === "レックウザ" && move.name === "ガリョウテンセイ" && !activePlayer.isMega) {
+                    showMessage("レックウザの メガシンカ！");
+                    playSE("mega");
+                    let pSprite = document.getElementById("player-sprite");
+                    pSprite.classList.add("mega-evolve-anim");
+                    await wait(1500);
+                    activePlayer.name = "メガレックウザ";
+                    activePlayer.imgFile = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10079.png";
+                    activePlayer.isMega = true;
+                    updateUI();
+
+                    // --- 隕石破壊＆デオキシス登場シーケンス ---
+                    await showMeteoriteDeoxysSequence();
+                }
+
+                // 専用演出チェック
+                if (move.name === "コアパニッシャー") {
+                    await showCoreEnforcerEffect();
+                } else if (move.name === "だんがいのつるぎ") {
+                    await showPrecipiceBladesEffect();
+                } else if (move.name === "だんがいのはどう") {
+                    await showPrecipiceWaveEffect();
+                } else if (move.name === "こんげんのつるぎ") {
+                    await showOriginSwordEffect();
+                } else if (move.name === "シャドードライブ") {
+                    await showShadowDriveEffect();
+                } else if (move.name === "メテオレイ") {
+                    await showMeteorRayEffect();
+                } else if (move.name === "サンシャインスマッシャー") {
+                    await showSunshineSmasherEffect();
+                } else if (move.name === "ムーンライトブラスター") {
+                    await showMoonlightBlasterEffect();
+                }
+
+                // ダメージ計算
+                let dmg = Math.floor(move.power * (Math.random() * 0.4 + 0.8));
+
+                // エフェクト
+                if (move.name === "みずしゅりけん") {
+                    showShurikenEffect();
+                } else {
+                    flashEffect(); // 汎用エフェクト
+                    playSE("hit");
+                }
+
+                // 相手がゆれる
+                let oppSprite = document.getElementById("opponent-sprite");
+                oppSprite.classList.remove("shake");
+                void oppSprite.offsetWidth; // リセット技
+                oppSprite.classList.add("shake");
+
+                activeOpponent.currentHp -= dmg;
+                if (activeOpponent.currentHp < 0) activeOpponent.currentHp = 0;
+                updateUI();
+
+                if (hits > 1) {
+                    showMessage((i + 1) + "かいめ の こうげき！");
+                    await wait(500);
+                }
+                totalDamage += dmg;
+            }
+
+            if (activeOpponent.currentHp > 0 && move.power > 0) {
+                if (hits > 1) {
+                    showMessage("あわせて " + hits + "かい 当たった！");
+                    await wait(1000);
+                } else {
+                    // 通常攻撃
+                    showMessage("相手に ダメージを あたえた！");
+                    await wait(1000);
+                }
+            }
+
+            // 倒したか判定
+            if (activeOpponent.currentHp <= 0) {
+                showMessage(activeOpponent.name + " を たおした！");
+                await wait(2000);
+
+                // --- 形態変化のロジック ---
+                if (activeOpponent.name === "ネクロズマ") {
+                    // 通常 -> 月食
+                    showMessage("……おや！？ ネクロズマの 様子が……！");
+                    await wait(2000);
+                    showMessage("ネクロズマは あかつきのつばさに 変形した！");
+
+                    // データを月食に入れ替え
+                    activeOpponent = dawnWingsNecrozma;
+                    activeOpponent.currentHp = activeOpponent.maxHp;
+                    updateUI();
+
+                    // 変身エフェクト
+                    let os = document.getElementById("opponent-sprite");
+                    os.classList.add("transform-anim");
+                    flashEffect();
+                    await wait(2000);
+                    os.classList.remove("transform-anim");
+
+                    showMessage("ネクロズマ（あかつきのつばさ）の 逆襲が 始まる！");
+                    await wait(2000);
+
+                    // バトル続行
+                    backToCommand();
+                    return;
+
+                } else if (activeOpponent.name === "ネクロズマ（あかつきのつばさ）") {
+                    // 第2形態撃破 -> ルナアーラ解放＆合体イベント -> 第3形態（ウルトラ）へ
+                    showMessage("あかつきのつばさ の 影が 霧散していく……");
+                    await wait(2000);
+
+                    showMessage("囚われていた ルナアーラが 姿を現した！");
+                    playSE("mega");
+                    await wait(1500);
+
+                    showMessage("救い出された ルナアーラが ソルガレオと 響き合う！");
+                    await wait(2000);
+
+                    showMessage("ルナアーラが 仲間に 加わった！");
+                    if (!myParty.includes(lunala)) {
+                        myParty.push(lunala);
+                        document.getElementById("lunala-switch-btn").style.display = "block";
+                    }
+                    await wait(1500);
+
+                    // 合体！
+                    let sIndex = myParty.findIndex(p => p.name === "ソルガレオ");
+                    if (sIndex !== -1) {
+                        myParty[sIndex] = solgaleoLunala;
+                        if (activePlayer.name === "ソルガレオ") activePlayer = solgaleoLunala;
+                        // ボタンの表示名を更新
+                        let sBtn = document.querySelector("#pokemon-box button:nth-child(2)");
+                        if (sBtn) sBtn.innerText = "ソルガレオ＆ルナアーラ";
+                    }
+                    showMessage("太陽と月の 究極の姿、覚醒！");
+                    updateUI();
+                    await wait(2000);
+
+                    showMessage("しかし…… 飛び散った光が 収束していく！");
+                    await wait(2000);
+                    showMessage("天を焦がす 光…… ウルトラネクロズマ 覚醒！");
+
+                    activeOpponent = ultraNecrozma;
+                    activeOpponent.currentHp = activeOpponent.maxHp;
+                    updateUI();
+
+                    let os2 = document.getElementById("opponent-sprite");
+                    os2.classList.add("transform-anim");
+                    flashEffect();
+                    let ws = document.getElementById("wormhole");
+                    ws.style.opacity = "0.5";
+
+                    await wait(2000);
+                    os2.classList.remove("transform-anim");
+
+                    showMessage("全てを 照らす 光と なって 襲いかかる！");
+                    await wait(2000);
+
+                    backToCommand();
+                    return;
+                } else {
+                    // ウルトラネクロズマ撃破（完全勝利）
+                    showMessage("ウルトラネクロズマの 光が 弱まっていく……");
+                    await wait(2000);
+
+                    // 通常ネクロズマに戻る
+                    activeOpponent = necrozma; // 画像と名前を通常に戻す
+                    updateUI();
+                    showMessage("ウルトラネクロズマは 通常の姿に 戻った！");
+                    await wait(2000);
+
+                    // ウルトラホールに吸い込まれる演出
+                    let wormhole = document.getElementById("wormhole");
+                    wormhole.style.opacity = "1"; // ホールを再表示
+                    wormhole.classList.add("spinning");
+
+                    let os = document.getElementById("opponent-sprite");
+                    os.classList.add("suction-anim");
+                    showMessage("ああっ！ ネクロズマが ウルトラホールに 吸い込まれていく！");
+                    await wait(2500);
+
+                    os.style.opacity = "0";
+                    wormhole.style.opacity = "0";
+
+                    showMessage("しょうぶに かった！ 世界に 平和が もどった！");
+                    return;
+                }
+            }
+
+            // 相手のターン
+            await opponentTurn();
+
+            // プレイヤーが生きていればコマンドに戻る
+            // （倒れている場合は cheekGameOver() がスイッチ画面を出しているので、上書きしない）
+            if (activePlayer.currentHp > 0) {
+                backToCommand();
+            }
+        }
+
+        // ==========================================
+        // 相手のターン
+        // ==========================================
+        async function opponentTurn() {
+            showMessage(activeOpponent.name + " の 攻撃！");
+            await wait(1000);
+
+            let rand = Math.floor(Math.random() * 4);
+            let move = activeOpponent.moves[rand];
+
+            showMessage(activeOpponent.name + " の " + move.name + "！");
+            await wait(500);
+
+            // 攻撃モーション
+            let oSprite = document.getElementById("opponent-sprite");
+            oSprite.classList.remove("attack-opponent");
+            void oSprite.offsetWidth;
+            oSprite.classList.add("attack-opponent");
+            await wait(300);
+
+            flashEffect(); // 敵の攻撃エフェクト
+            playSE("hit");
+
+            document.getElementById("player-sprite").classList.add("shake");
+            setTimeout(function () {
+                document.getElementById("player-sprite").classList.remove("shake");
+            }, 500);
+
+            let damage = Math.floor(move.power * (Math.random() * 0.4 + 0.8));
+            activePlayer.currentHp -= damage;
+            if (activePlayer.currentHp < 0) activePlayer.currentHp = 0;
+            updateUI();
+
+            showMessage(activePlayer.name + " に " + damage + " の ダメージ！");
+            await wait(1000);
+
+            if (activePlayer.currentHp <= 0) {
+                // --- ジガルデ変身ロジック ---
+                if (activePlayer.name === "ジガルデ（１０％）") {
+                    showMessage("ジガルデの 姿が 変わる！");
+                    await wait(1500);
+                    activePlayer = zygarde50;
+                    myParty[myPokemonIndex] = zygarde50;
+                    activePlayer.currentHp = activePlayer.maxHp;
+                    updateUI();
+                    showMessage("ジガルデ（５０％） 覚醒！");
+                    await wait(1500);
+                    return; // ターン終了せず耐える
+                } else if (activePlayer.name === "ジガルデ（５０％）") {
+                    showMessage("ジガルデの 体から 光が あふれだす！");
+                    await wait(1500);
+                    activePlayer = zygardeComplete;
+                    myParty[myPokemonIndex] = zygardeComplete;
+                    activePlayer.currentHp = activePlayer.maxHp;
+                    updateUI();
+                    showMessage("ジガルデ（パーフェクト） 全力解放！");
+                    await wait(1500);
+                    return; // 耐える
+                } else if (activePlayer.name === "デオキシス") {
+                    showMessage("デオキシスの 細胞が 活性化する！");
+                    await wait(1500);
+                    activePlayer = deoxysAttack;
+                    myParty[myPokemonIndex] = deoxysAttack;
+                    activePlayer.currentHp = activePlayer.maxHp;
+                    updateUI();
+                    showMessage("デオキシス（アタックフォルム）に変身！");
+                    await wait(1500);
+                    return;
+                } else if (activePlayer.name === "デオキシス（アタック）") {
+                    showMessage("デオキシスが 防御形態を 取った！");
+                    await wait(1500);
+                    activePlayer = deoxysDefense;
+                    myParty[myPokemonIndex] = deoxysDefense;
+                    activePlayer.currentHp = activePlayer.maxHp;
+                    updateUI();
+                    showMessage("デオキシス（ディフェンスフォルム）に変身！");
+                    await wait(1500);
+                    return;
+                } else if (activePlayer.name === "デオキシス（ディフェンス）") {
+                    showMessage("デオキシスが 加速する！");
+                    await wait(1500);
+                    activePlayer = deoxysSpeed;
+                    myParty[myPokemonIndex] = deoxysSpeed;
+                    activePlayer.currentHp = activePlayer.maxHp;
+                    updateUI();
+                    showMessage("デオキシス（スピードフォルム）に変身！");
+                    await wait(1500);
+                    return;
+                }
+
+                showMessage(activePlayer.name + " は たおれた！");
+                await wait(1500);
+                checkGameOver();
+            }
+        }
+
+        // ==========================================
+        // ゲームオーバー判定
+        // ==========================================
+        async function checkGameOver() {
+            // 残りのポケモンがいるか
+            let alive = false;
+            for (let poke of myParty) {
+                if (poke.currentHp > 0) alive = true;
+            }
+
+            if (alive) {
+                showMessage("つぎの ポケモンを だそう！");
+                showSwitch(true); // 強制交代フラグON
+            } else {
+                showMessage("手持ちのポケモンが いなくなった……");
+                await wait(2000);
+                showMessage("目の前が 真っ暗に なった……");
+                await wait(2000);
+                // ゲームオーバー画面を表示
+                document.getElementById("game-over-screen").style.display = "flex";
+            }
+        }
+
+        // ==========================================
+        // 交代機能
+        // ==========================================
+        async function switchPokemon(index) {
+            if (index === myPokemonIndex) return; // 自分と同じなら無視
+
+            let target = myParty[index];
+            if (target.currentHp <= 0) {
+                showMessage("そのポケモンは ひんし だ！");
+                return;
+            }
+
+            document.getElementById("pokemon-box").style.display = "none";
+
+            // 今のポケモンがひんしかどうかチェック
+            let wasFainted = (activePlayer.currentHp <= 0);
+
+            // 今のポケモンが生きていれば「もどれ」と言う
+            if (!wasFainted) {
+                showMessage(activePlayer.name + " もどれ！");
+                await wait(1000);
+            }
+
+            myPokemonIndex = index;
+            activePlayer = myParty[myPokemonIndex];
+
+            showMessage("いけっ！ " + activePlayer.name + "！");
+            updateUI();
+            await wait(1000);
+
+            // 交代したターン、相手の攻撃がくるかどうか
+            if (wasFainted) {
+                // 死に出し（ひんしからの交代）なので、相手のターンはスキップ（次は自分のターン）
+                backToCommand();
+            } else {
+                // 通常の交代なので、相手の攻撃を受ける
+                await opponentTurn();
+                // プレイヤーが生きていればコマンドへ
+                if (activePlayer.currentHp > 0) {
+                    backToCommand();
+                }
+            }
+        }
+
+        // ==========================================
+        // 捕獲機能
+        // ==========================================
+        async function tryCatch() {
+            // 捕獲処理
+            document.getElementById("command-box").style.display = "none";
+            showMessage("モンスターボールを 投げた！");
+            playSE("throw");
+
+            let ball = document.createElement("div");
+            ball.className = "ball ball-throw";
+            document.getElementById("game-container").appendChild(ball);
+
+            await wait(1000);
+
+            // ボールが当たった瞬間
+            let oppSprite = document.getElementById("opponent-sprite");
+            oppSprite.classList.add("absorbed");
+            playSE("ball-hit");
+            await wait(500);
+
+            ball.classList.remove("ball-throw");
+            ball.style.left = "80%";
+            ball.style.top = "15%";
+
+            // ボールの揺れ
+            for (let i = 0; i < 3; i++) {
+                ball.classList.add("ball-shake");
+                playSE("shake");
+                await wait(800);
+                ball.classList.remove("ball-shake");
+                await wait(200);
+            }
+
+            // 成功判定
+            let catchRate = (activeOpponent.maxHp - activeOpponent.currentHp) / activeOpponent.maxHp;
+            catchRate = catchRate * 0.5;
+            if (catchRate < 0.1) catchRate = 0.1;
+
+            if (activeOpponent.name !== "ウルトラネクロズマ") {
+                catchRate = 0;
+            }
+
+            let chance = Math.random();
+            if (chance < catchRate) {
+                playSE("catch-success");
+                showMessage("カチッ！ ……やったー！");
+                await wait(1000);
+                showMessage(activeOpponent.name + " を つかまえた！");
+                await wait(2000);
+                showMessage("世界の 光を 取り戻した！ ゲームクリア！");
+            } else {
+                // 失敗
+                playSE("catch-fail");
+                ball.remove();
+                oppSprite.classList.remove("absorbed");
+                showMessage("だめだ！ 強すぎて ボールが 通じない！");
+                await wait(1000);
+                await opponentTurn();
+                backToCommand();
+            }
+        }
+
+        async function runAway() {
+            showMessage("うまく 逃げ切れた！");
+            await wait(1000);
+            document.getElementById("game-container").innerHTML = "<div style='display:flex;justify-content:center;align-items:center;height:100%;font-size:30px;'>おわり</div>";
+        }
+
+        // ==========================================
+        // エフェクト用
+        // ==========================================
+        function flashEffect() {
+            let el = document.getElementById("effect-layer");
+            el.classList.remove("flash-anim");
+            void el.offsetWidth;
+            el.classList.add("flash-anim");
+        }
+
+        function showShurikenEffect() {
+            let layer = document.getElementById("shuriken-layer");
+            let s = document.createElement("div");
+            s.className = "shuriken throw-shuriken";
+            layer.appendChild(s);
+            playSE("hit");
+            setTimeout(function () {
+                s.remove();
+            }, 500);
+        }
+
+        async function showCoreEnforcerEffect() {
+            let pSprite = document.getElementById("player-sprite");
+            pSprite.classList.add("jump-up");
+            showMessage("ジガルデが 高く 飛び上がった！");
+            await wait(1000);
+
+            // Zを描く
+            let container = document.getElementById("game-container");
+            let lines = [];
+
+            // Line 1: Top horizontal (Left to Right)
+            let l1 = document.createElement("div");
+            l1.className = "z-line z-draw-1";
+            l1.style.width = "200px"; l1.style.height = "15px"; l1.style.left = "35%"; l1.style.top = "30%";
+            l1.style.transformOrigin = "left";
+            container.appendChild(l1);
+
+            // Line 2: Diagonal (Top Right to Bottom Left)
+            let l2 = document.createElement("div");
+            l2.className = "z-line z-draw-2";
+            l2.style.width = "260px"; l2.style.height = "15px"; l2.style.left = "35%"; l2.style.top = "45%";
+            l2.style.transform = "rotate(135deg)";
+            l2.style.transformOrigin = "right";
+            container.appendChild(l2);
+
+            // Line 3: Bottom horizontal (Left to Right)
+            let l3 = document.createElement("div");
+            l3.className = "z-line z-draw-3";
+            l3.style.width = "200px"; l3.style.height = "15px"; l3.style.left = "35%"; l3.style.top = "60%";
+            l3.style.transformOrigin = "left";
+            container.appendChild(l3);
+
+            playSE("z-draw");
+            await wait(1000);
+
+            flashEffect();
+            playSE("hit");
+
+            [l1, l2, l3].forEach(l => l.remove());
+            pSprite.classList.remove("jump-up");
+        }
+
+        async function showPrecipiceWaveEffect() {
+            showMessage("岩と 水の竜巻が 襲いかかる！");
+            let container = document.getElementById("game-container");
+
+            // 岩
+            let rock = document.createElement("div");
+            rock.className = "giant-rock";
+            container.appendChild(rock);
+
+            // 竜巻
+            let tornado = document.createElement("div");
+            tornado.className = "water-tornado";
+            container.appendChild(tornado);
+
+            playSE("rock");
+            playSE("z-draw"); // 竜巻音
+            await wait(1000);
+
+            flashEffect();
+            playSE("hit");
+
+            rock.remove();
+            tornado.remove();
+        }
+
+        async function showOriginSwordEffect() {
+            showMessage("水のトルネードが 敵を 拘束する！");
+            let container = document.getElementById("game-container");
+
+            // トルネード
+            let tornado = document.createElement("div");
+            tornado.className = "water-tornado";
+            container.appendChild(tornado);
+            playSE("z-draw");
+            await wait(500);
+
+            // 岩での拘束
+            let rock = document.createElement("div");
+            rock.className = "giant-rock";
+            rock.style.transform = "translateY(-300px) scale(1.2)";
+            rock.style.animation = "none"; // 動かない
+            container.appendChild(rock);
+            showMessage("岩石に 封じられた！");
+            await wait(1000);
+
+            // 水と石の剣での切りつけ
+            for (let i = 0; i < 3; i++) {
+                let sword = document.createElement("div");
+                sword.className = "water-sword slash-anim";
+                sword.style.left = (70 + Math.random() * 10) + "%";
+                container.appendChild(sword);
+                playSE("hit");
+                await wait(300);
+                setTimeout(() => sword.remove(), 500);
+            }
+
+            flashEffect();
+            rock.remove();
+            tornado.remove();
+        }
+
+        async function showShadowDriveEffect() {
+            let playerArea = document.querySelector(".player-area");
+            let layer = document.getElementById("reverse-world-layer");
+
+            showMessage("反転世界に 潜り込んだ！");
+            layer.style.background = "rgba(75, 0, 130, 0.7)";
+            playerArea.style.opacity = "0.3";
+            await wait(1000);
+
+            showMessage("全方位からの 影の乱舞！");
+            let container = document.getElementById("game-container");
+            for (let i = 0; i < 10; i++) {
+                let s = document.createElement("div");
+                s.className = "shadow-slash";
+                s.style.left = (65 + Math.random() * 25) + "%";
+                s.style.top = (10 + Math.random() * 50) + "%";
+                s.style.transform = `rotate(${Math.random() * 360}deg)`;
+                s.style.opacity = "1";
+                container.appendChild(s);
+                playSE("hit");
+                await wait(100);
+                setTimeout(() => s.remove(), 300);
+            }
+
+            flashEffect();
+            layer.style.background = "rgba(75, 0, 130, 0)";
+            playerArea.style.opacity = "1";
+            await wait(500);
+        }
+
+        async function showMeteorRayEffect() {
+            let pSprite = document.getElementById("player-sprite");
+            pSprite.classList.add("jump-up");
+            showMessage("太陽と月の 力を 収束する！");
+            await wait(1000);
+
+            let container = document.getElementById("game-container");
+            let colors = ["#ffff00", "#ffffff", "#4b0082", "#ff4500", "#c0c0c0"]; // Sun, Space, Ghost, Sun, Moon
+            for (let i = 0; i < 15; i++) {
+                let orb = document.createElement("div");
+                orb.className = "power-orb";
+                orb.style.background = colors[i % colors.length];
+                orb.style.boxShadow = `0 0 15px ${colors[i % colors.length]}`;
+                orb.style.left = (Math.random() * 100) + "%";
+                orb.style.top = (Math.random() * 60) + "%";
+                container.appendChild(orb);
+                orb.animate([
+                    { transform: "scale(0) translate(0,0)", opacity: 1 },
+                    { transform: "scale(2) translate(0,0)", opacity: 0 }
+                ], { duration: 500 });
+                setTimeout(() => orb.remove(), 500);
+            }
+            playSE("z-draw");
+            await wait(1000);
+
+            showMessage("極大の ビーム剣が 飛来する！");
+            let sword = document.createElement("div");
+            sword.className = "beam-sword";
+            container.appendChild(sword);
+
+            // 下降アニメーション
+            sword.animate([
+                { transform: "translate(100px, -300px) rotate(20deg)", opacity: 1 },
+                { transform: "translate(-100px, 300px) rotate(20deg)", opacity: 1 }
+            ], { duration: 500, easing: "ease-in" });
+
+            await wait(400);
+            playSE("hit");
+            flashEffect();
+            await wait(600);
+
+            sword.remove();
+            pSprite.classList.remove("jump-up");
+        }
+
+        async function showMeteoriteDeoxysSequence() {
+            showMessage("空から 巨大な隕石が 迫りくる！");
+
+            let container = document.getElementById("game-container");
+            let met = document.createElement("div");
+            met.className = "meteorite meteorite-fall";
+            container.appendChild(met);
+
+            await wait(1000);
+
+            showMessage("メガレックウザが 隕石を 砕いた！");
+            playSE("hit");
+
+            // 爆発演出
+            let exp = document.createElement("div");
+            exp.className = "explosion-circle explode-anim";
+            container.appendChild(exp);
+            met.remove();
+
+            await wait(1500);
+            exp.remove();
+
+            showMessage("ボロボロになった 隕石の中から ポケモンが……？");
+            await wait(2000);
+
+            showMessage("それは 宇宙の生命体 デオキシスだった！");
+            await wait(2000);
+
+            showMessage("デオキシスが 仲間に 加わった！");
+            playSE("catch-success");
+
+            // パーティに追加
+            if (!myParty.includes(deoxysNormal)) {
+                myParty.push(deoxysNormal);
+                document.getElementById("deoxys-switch-btn").style.display = "block";
+            }
+            await wait(2000);
+
+            // すぐに攻撃する
+            showMessage("デオキシスが 飛び出した！");
+            // 今出ているレックウザを一時的に待機させ、デオキシスをセット
+            let oldIndex = myPokemonIndex;
+            activePlayer = deoxysNormal;
+            myPokemonIndex = 4; // index 4 is Deoxys
+            updateUI();
+            await wait(1000);
+
+            // 攻撃実行（サイコブースト）
+            await useMove(0);
+        }
+
+        async function showSunshineSmasherEffect() {
+            showMessage("ソルガレオが 太陽の力を 集める！");
+            let pSprite = document.getElementById("player-sprite");
+            pSprite.classList.add("jump-up");
+            await wait(1000);
+
+            showMessage("サンシャインスマッシャー！！");
+            let container = document.getElementById("game-container");
+
+            let sun = document.createElement("div");
+            sun.className = "sun-ball sun-crash";
+            container.appendChild(sun);
+
+            playSE("z-draw");
+            await wait(800);
+            playSE("hit");
+            flashEffect();
+
+            await wait(500);
+            sun.remove();
+            pSprite.classList.remove("jump-up");
+        }
+
+        async function showMoonlightBlasterEffect() {
+            showMessage("ルナアーラが 月の光を 解き放つ！");
+            let container = document.getElementById("game-container");
+
+            // 背景を暗くして月を出す
+            let bg = document.createElement("div");
+            bg.className = "moon-bg";
+            let moon = document.createElement("div");
+            moon.className = "full-moon";
+            bg.appendChild(moon);
+            container.appendChild(bg);
+
+            // フェードイン
+            setTimeout(() => {
+                bg.style.opacity = "1";
+                moon.style.opacity = "1";
+            }, 10);
+
+            await wait(1500);
+            showMessage("ムーンライトブラスター！！");
+            playSE("z-draw");
+
+            // ビーム発射
+            let beam = document.createElement("div");
+            beam.className = "moon-beam beam-fire";
+            // プレイヤー位置付近から発射
+            beam.style.bottom = "150px";
+            beam.style.left = "200px";
+            container.appendChild(beam);
+
+            await wait(300);
+            flashEffect();
+            playSE("hit");
+
+            await wait(1000);
+
+            // 片付け
+            bg.style.opacity = "0";
+            setTimeout(() => {
+                bg.remove();
+                beam.remove();
+            }, 500);
+        }
+
+        // ==========================================
+        // サウンド機能
+        // ==========================================
+        let bgm = null;
+        function playBGM() {
+            if (bgm) return;
+            bgm = new Audio("https://cdn.pixabay.com/audio/2022/02/22/audio_d0c6ff1101.mp3");
+            bgm.loop = true;
+            bgm.volume = 0.2;
+            bgm.play().catch(e => console.log("Autoplay blocked"));
+        }
+
+        function playSE(type) {
+            let ctx = new (window.AudioContext || window.webkitAudioContext)();
+            let osc = ctx.createOscillator();
+            let gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === "hit") {
+                osc.type = "sawtooth";
+                osc.frequency.setValueAtTime(200, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            } else if (type === "throw") {
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            } else if (type === "z-draw") {
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            } else if (type === "mega") {
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(440, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 1);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            } else if (type === "rock") {
+                osc.type = "square";
+                osc.frequency.setValueAtTime(100, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            } else {
+                osc.frequency.setValueAtTime(100, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            }
+
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+        }
+
+        function initGame() {
+            document.getElementById("start-overlay").style.display = "none";
+            startIntro();
+            updateUI();
+        }
+
+        function wait(ms) {
+            return new Promise(function (resolve) {
+                setTimeout(resolve, ms);
+            });
+        }
+
+        // 初期化は initGame で行うため、ここでは呼ばない
+        // startIntro();
+        // updateUI();
+
+    </script>
+</body>
+
+</html>
