@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケポケ風カードバトル</title>
+    <!-- アイコンフォント (Font Awesome) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* 
+           デザイン・スタイル設定
+           ポケポケ風のプレミアム感を出すために、ガラスモーフィズム、メタリックグラデーション、
+           そして流れるようなアニメーションを多用します。
+        */
+        :root {
+            --primary: #3b82f6;
+            --primary-light: #60a5fa;
+            --accent: #f59e0b;
+            --bg-dark: #0f172a;
+            --card-width: 140px;
+            --card-aspect: 0.714;
+            --glass: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --card-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            color: #f8fafc;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            max-width: 480px;
+            background: var(--bg-dark);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-left: 1px solid var(--glass-border);
+            border-right: 1px solid var(--glass-border);
+        }
+
+        /* 共通の画面スタイル */
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            text-align: center;
+            overflow: hidden;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .screen.active {
+            display: flex;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 900;
+            margin: 10px 0;
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            letter-spacing: 2px;
+            background: linear-gradient(to bottom, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- パック開封画面 --- */
+        #pack-screen {
+            justify-content: center;
+            background: radial-gradient(circle at 50% 50%, #1e3a8a 0%, #0f172a 100%);
+        }
+
+        .pack-area {
+            position: relative;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pack-item {
+            width: 180px;
+            height: 280px;
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .pack-item::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: packShine 3s infinite;
+        }
+
+        @keyframes packShine {
+            0% {
+                transform: translateX(-100%) rotate(45deg);
+            }
+
+            100% {
+                transform: translateX(100%) rotate(45deg);
+            }
+        }
+
+        .pack-item:hover {
+            transform: scale(1.05) translateY(-10px);
+            box-shadow: 0 0 70px rgba(59, 130, 246, 0.5);
+        }
+
+        .pack-count-select {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .count-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: 0.3s;
+        }
+
+        .count-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        /* --- コレクション画面 --- */
+        .collection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 15px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .card-wrapper {
+            position: relative;
+            aspect-ratio: 0.714;
+            perspective: 1000px;
+        }
+
+        .visual-card {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            background: #fff;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .visual-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-info-mini {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+            padding: 5px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .card-wrapper.selected .visual-card {
+            outline: 3px solid var(--primary);
+            transform: scale(0.95);
+        }
+
+        /* --- バトル画面 --- */
+        #battle-screen {
+            padding: 0;
+            background: #000;
+        }
+
+        .battle-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: linear-gradient(to bottom, #1e293b, #0f172a);
+        }
+
+        .battle-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .battle-card {
+            width: 160px;
+            aspect-ratio: 0.714;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            position: relative;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+
+        .battle-info {
+            position: absolute;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .hp-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .hp-text {
+            font-weight: 900;
+            color: #ef4444;
+            font-size: 14px;
+        }
+
+        .hp-bar-outer {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            background: #22c55e;
+            width: 100%;
+            transition: width 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .energy-rail {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .energy-orb {
+            width: 14px;
+            height: 14px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--primary);
+            animation: energyPulse 2s infinite;
+        }
+
+        @keyframes energyPulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+        }
+
+        /* --- アクションバー --- */
+        .battle-controls {
+            background: var(--bg-dark);
+            border-top: 1px solid var(--glass-border);
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+            border-radius: 30px 30px 0 0;
+        }
+
+        .action-btn {
+            flex: 1;
+            height: 60px;
+            border: none;
+            border-radius: 15px;
+            font-weight: 900;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-attack {
+            background: linear-gradient(to bottom, #ef4444, #b91c1c);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-end {
+            background: linear-gradient(to bottom, #475569, #1e293b);
+            color: white;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* --- エフェクト --- */
+        .log-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 30px;
+            border-radius: 30px;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: 0.3s;
+            font-weight: 900;
+        }
+
+        .log-overlay.show {
+            opacity: 1;
+            transform: translate(-50%, -70%);
+        }
+
+        /* 3Dカード詳細 */
+        .card-detail-modal {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .detail-card {
+            width: 280px;
+            aspect-ratio: 0.714;
+            border-radius: 20px;
+            background: #fff;
+            transform-style: preserve-3d;
+            box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
+            margin-bottom: 30px;
+        }
+
+        /* キラキラエフェクト */
+        .holo-sparkle {
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 20%),
+                radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 10%);
+            background-size: 100px 100px;
+            opacity: 0.5;
+            mix-blend-mode: color-dodge;
+            pointer-events: none;
+        }
+    </style>
+
+    /* --- 演出用アニメーション --- */
+    @keyframes openPack {
+    0% {
+    transform: scale(1);
+    }
+
+    50% {
+    transform: scale(1.2);
+    filter: brightness(2);
+    }
+
+    100% {
+    transform: scale(0);
+    opacity: 0;
+    }
+    }
+
+    .opening {
+    animation: openPack 0.8s forwards;
+    }
+
+    /* ポップアップ */
+    .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    flex-direction: column;
+    }
+
+    .overlay.visible {
+    display: flex;
+    }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+
+        <!-- 1. パック開封画面 -->
+        <div id="pack-screen" class="screen active">
+            <h1>PACK OPENING</h1>
+            <p style="color: #94a3b8;">パックをタップしてカードを引こう！</p>
+
+            <div class="pack-area">
+                <div class="pack-item" id="pack" onclick="openPack()">
+                    <div style="font-size: 60px; text-align: center; margin-bottom: 20px;">
+                        <i class="fas fa-bolt" style="color: #f59e0b; filter: drop-shadow(0 0 10px #f59e0b);"></i>
+                    </div>
+                    <div style="font-weight: 900; font-size: 18px; text-align: center;">PIKACHU BUNDLE</div>
+                </div>
+            </div>
+
+            <div class="pack-count-select">
+                <button class="count-btn active" onclick="setPackCount(1, this)">1 PACK</button>
+                <button class="count-btn" onclick="setPackCount(10, this)">10 PACKS</button>
+            </div>
+        </div>
+
+        <!-- 2. コレクション・デッキ確認画面 -->
+        <div id="deck-screen" class="screen">
+            <div class="collection-header">
+                <h1>COLLECTION</h1>
+                <div id="selection-status" style="font-weight: 900; color: var(--primary);">0 / 3</div>
+            </div>
+            <p style="font-size: 12px; color: #94a3b8; margin: 0 0 10px 0;">バトルに使う3枚を選んでください</p>
+
+            <div id="collection-grid" class="card-grid"></div>
+
+            <button id="start-battle-btn" class="action-btn btn-attack" onclick="startBattle()"
+                style="width: 100%; height: 50px; margin-top: 10px;" disabled>START BATTLE</button>
+        </div>
+
+        <!-- 3. バトル画面 -->
+        <div id="battle-screen" class="screen">
+            <div class="battle-view">
+                <!-- 相手側 -->
+                <div class="battle-side">
+                    <div class="battle-info" style="top: 10px;">
+                        <div class="hp-container">
+                            <span class="hp-text">HP <span id="p2-hp">???</span></span>
+                            <div class="hp-bar-outer">
+                                <div id="p2-hp-fill" class="hp-bar-inner"></div>
+                            </div>
+                        </div>
+                        <div style="font-size: 10px; font-weight: 900; margin-top: 5px; color: white; text-align: left;"
+                            id="p2-name">ポケモン名</div>
+                    </div>
+
+                    <div id="p2-card-view" class="battle-card">
+                        <div id="p2-visual"></div>
+                        <div class="holo-sparkle"></div>
+                    </div>
+
+                    <div class="energy-rail" id="p2-energy"></div>
+                    <div style="position: absolute; right: 20px; bottom: 20px; font-weight: 900; font-size: 24px; color: rgba(255,255,255,0.2);"
+                        id="p2-points">0</div>
+                </div>
+
+                <!-- ログオーバーレイ -->
+                <div id="log-overlay" class="log-overlay">DAMAGE!!</div>
+
+                <!-- 自分側 -->
+                <div class="battle-side">
+                    <div style="position: absolute; left: 20px; top: 20px; font-weight: 900; font-size: 24px; color: rgba(255,255,255,0.2);"
+                        id="p1-points">0</div>
+
+                    <div id="p1-card-view" class="battle-card">
+                        <div id="p1-visual"></div>
+                        <div class="holo-sparkle"></div>
+                    </div>
+
+                    <div class="energy-rail" id="p1-energy"></div>
+
+                    <div class="battle-info" style="bottom: 10px;">
+                        <div style="font-size: 10px; font-weight: 900; margin-bottom: 5px; color: white; text-align: left;"
+                            id="p1-name">ポケモン名</div>
+                        <div class="hp-container">
+                            <span class="hp-text">HP <span id="p1-hp">???</span></span>
+                            <div class="hp-bar-outer">
+                                <div id="p1-hp-fill" class="hp-bar-inner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作 -->
+            <div class="battle-controls">
+                <button id="attack-btn" class="action-btn btn-attack" onclick="attack()">
+                    <span style="font-size: 10px;">ATTACK</span>
+                    <span id="move-name">わざ</span>
+                </button>
+                <button class="action-btn btn-end" onclick="endTurn()">
+                    <span style="font-size: 10px;">TURN</span>
+                    <span>END</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. カード詳細モーダル -->
+        <div id="card-detail" class="card-detail-modal" onclick="closeDetail()">
+            <div class="detail-card" id="detail-visual">
+                <!-- 3D Card Content -->
+            </div>
+            <h2 id="detail-name" style="margin: 0; font-weight: 900;">CARD NAME</h2>
+            <p id="detail-desc" style="color: #94a3b8; font-size: 14px;">Detailed description here...</p>
+        </div>
+
+        <!-- 結果表示オーバーレイ -->
+        <div id="result-overlay" class="overlay">
+            <h1 id="winner-text" style="font-size: 48px; margin-bottom: 20px;">VICTORY</h1>
+            <button class="action-btn btn-attack" onclick="location.reload()" style="width: 200px;">TRY AGAIN</button>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * カードマスターデータ
+         * イラスト、技、HP、レアリティを定義します。
+         * イラストはグラデーションとアイコンを組み合わせたデザインを使用します。
+         */
+        const CARDS = [
+            { id: 0, name: "リザードン", icon: "fa-fire", hp: 200, color: "linear-gradient(135deg, #ef4444, #991b1b)", power: 80, move: "かえんほうしゃ", rarity: "★★★" },
+            { id: 1, name: "カメックス", icon: "fa-tint", hp: 180, color: "linear-gradient(135deg, #3b82f6, #1e40af)", power: 60, move: "ハイドロポンプ", rarity: "★★★" },
+            { id: 2, name: "フシギバナ", icon: "fa-leaf", hp: 190, color: "linear-gradient(135deg, #10b981, #065f46)", power: 70, move: "ソーラービーム", rarity: "★★★" },
+            { id: 3, name: "ピカチュウ", icon: "fa-bolt", hp: 120, color: "linear-gradient(135deg, #f59e0b, #b45309)", power: 100, move: "10まんボルト", rarity: "★★" },
+            { id: 4, name: "ミュウツー", icon: "fa-brain", hp: 150, color: "linear-gradient(135deg, #a855f7, #6b21a8)", power: 120, move: "サイコキネシス", rarity: "★★★★" },
+            { id: 5, name: "ゲッコウガ", icon: "fa-water", hp: 140, color: "linear-gradient(135deg, #1d4ed8, #1e3a8a)", power: 90, move: "みずしゆりけん", rarity: "★★" },
+            { id: 6, name: "カイリュー", icon: "fa-dragon", hp: 220, color: "linear-gradient(135deg, #fbbf24, #d97706)", power: 110, move: "はかいこうせん", rarity: "★★★" },
+            { id: 7, name: "ルカリオ", icon: "fa-hand-fist", hp: 130, color: "linear-gradient(135deg, #475569, #1e293b)", power: 80, move: "はどうだん", rarity: "★" }
+        ];
+
+        let playerCollection = [];
+        let selectedDeck = [];
+        let packOpenCount = 1;
+        let battleState = {
+            p1: { hp: 0, energy: 0, points: 0, currentIndex: 0, deck: [] },
+            p2: { hp: 0, energy: 0, points: 0, currentIndex: 0, deck: [] },
+            turn: 1,
+            isOver: false
+        };
+
+        /**
+         * 1. パック数を設定する
+         */
+        function setPackCount(count, btn) {
+            packOpenCount = count;
+            const btns = document.querySelectorAll(".count-btn");
+            btns.forEach(function (b) { b.classList.remove("active"); });
+            btn.classList.add("active");
+        }
+
+        /**
+         * 2. パックを開封する処理
+         */
+        function openPack() {
+            const pack = document.getElementById("pack");
+            pack.style.animation = "openPack 0.8s forwards";
+
+            setTimeout(function () {
+                // パック数に応じて枚数を決める (1パック5枚)
+                const totalCards = packOpenCount * 5;
+                for (let i = 0; i < totalCards; i++) {
+                    const randomIdx = Math.floor(Math.random() * CARDS.length);
+                    // データをディープコピー
+                    const newCard = Object.assign({}, CARDS[randomIdx]);
+                    newCard.uid = Date.now() + Math.random(); // ユニークID
+                    playerCollection.push(newCard);
+                }
+
+                showScreen("deck-screen");
+                renderCollection();
+            }, 800);
+        }
+
+        /**
+         * 3. コレクションを表示する
+         */
+        function renderCollection() {
+            const grid = document.getElementById("collection-grid");
+            grid.innerHTML = "";
+            playerCollection.forEach(function (card, index) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "card-wrapper";
+                if (selectedDeck.indexOf(index) > -1) wrapper.classList.add("selected");
+
+                const visual = createCardVisual(card);
+                wrapper.appendChild(visual);
+
+                wrapper.onclick = function (e) {
+                    toggleSelectCard(index, wrapper);
+                };
+
+                // 右クリックで詳細を表示（PC配慮）
+                wrapper.oncontextmenu = function (e) {
+                    e.preventDefault();
+                    showDetail(card);
+                };
+
+                grid.appendChild(wrapper);
+            });
+        }
+
+        function createCardVisual(card, isLarge) {
+            const el = document.createElement("div");
+            el.className = "visual-card";
+            el.style.background = card.color;
+
+            const content = document.createElement("div");
+            content.style.width = "100%";
+            content.style.height = "100%";
+            content.style.display = "flex";
+            content.style.flexDirection = "column";
+            content.style.alignItems = "center";
+            content.style.justifyContent = "center";
+            content.style.color = "white";
+
+            const iconSize = isLarge ? "80px" : "40px";
+            content.innerHTML =
+                '<i class="fas ' + card.icon + '" style="font-size:' + iconSize + '; margin-bottom:10px; filter:drop-shadow(0 5px 15px rgba(0,0,0,0.3))"></i>' +
+                '<div style="font-weight:900; font-size:' + (isLarge ? "18px" : "10px") + '">' + card.name + '</div>' +
+                '<div style="font-size:8px; opacity:0.8; margin-top:5px;">' + card.rarity + '</div>';
+
+            el.appendChild(content);
+            return el;
+        }
+
+        function toggleSelectCard(index, element) {
+            const foundIdx = selectedDeck.indexOf(index);
+            if (foundIdx > -1) {
+                selectedDeck.splice(foundIdx, 1);
+                element.classList.remove("selected");
+            } else {
+                if (selectedDeck.length < 3) {
+                    selectedDeck.push(index);
+                    element.classList.add("selected");
+                }
+            }
+
+            const btn = document.getElementById("start-battle-btn");
+            btn.disabled = (selectedDeck.length !== 3);
+            document.getElementById("selection-status").innerText = selectedDeck.length + " / 3";
+        }
+
+        /**
+         * 4. カード詳細を表示
+         */
+        function showDetail(card) {
+            const modal = document.getElementById("card-detail");
+            const visualContainer = document.getElementById("detail-visual");
+            const nameEl = document.getElementById("detail-name");
+            const descEl = document.getElementById("detail-desc");
+
+            visualContainer.innerHTML = "";
+            visualContainer.appendChild(createCardVisual(card, true));
+            nameEl.innerText = card.name;
+            descEl.innerText = "HP: " + card.hp + " | 技: " + card.move + " (" + card.power + "ダメージ)\nレアリティ: " + card.rarity;
+
+            modal.style.display = "flex";
+
+            // 3D傾き効果
+            const cardEl = visualContainer.firstChild;
+            modal.onmousemove = function (e) {
+                const rect = cardEl.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = (centerY - y) / 10;
+                const rotateY = (x - centerX) / 10;
+                cardEl.style.transform = "rotateX(" + rotateX + "deg) rotateY(" + rotateY + "deg)";
+            };
+        }
+
+        function closeDetail() {
+            document.getElementById("card-detail").style.display = "none";
+        }
+
+        /**
+         * 5. バトル開始
+         */
+        function startBattle() {
+            battleState.p1.deck = selectedDeck.map(function (idx) { return Object.assign({}, playerCollection[idx]); });
+            battleState.p2.deck = [];
+            battleState.p1.currentIndex = 0;
+            battleState.p2.currentIndex = 0;
+
+            // 相手はランダムに3枚選ぶ
+            for (let i = 0; i < 3; i++) {
+                const r = Math.floor(Math.random() * CARDS.length);
+                battleState.p2.deck.push(Object.assign({}, CARDS[r]));
+            }
+
+            initPokemon(1);
+            initPokemon(2);
+
+            showScreen("battle-screen");
+            showBriefLog("バトル開始！");
+
+            battleState.p1.energy = 1;
+            battleState.p2.energy = 1;
+            battleState.p1.points = 0;
+            battleState.p2.points = 0;
+            battleState.isOver = false;
+            battleState.turn = 1;
+
+            updateBattleUI();
+        }
+
+        function initPokemon(pNum) {
+            const side = (pNum === 1) ? battleState.p1 : battleState.p2;
+            const current = side.deck[side.currentIndex];
+            side.hp = current.hp;
+        }
+
+        /**
+         * バトルの行動: 攻撃
+         */
+        function attack() {
+            if (battleState.isOver || battleState.turn !== 1) return;
+            if (battleState.p1.energy < 1) return;
+
+            const p1State = battleState.p1;
+            const p1Card = p1State.deck[p1State.currentIndex];
+            const p2State = battleState.p2;
+
+            const damage = p1Card.power + Math.floor(Math.random() * 20);
+            p2State.hp -= damage;
+            if (p2State.hp < 0) p2State.hp = 0;
+
+            p1State.energy -= 1;
+            showBriefLog(p1Card.move + "！ " + damage + " ダメージ！");
+
+            // 攻撃アニメーション（少し前に出る）
+            const cardEl = document.getElementById("p1-card-view");
+            cardEl.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-30px)' }, { transform: 'translateY(0)' }], { duration: 300 });
+
+            if (p2State.hp === 0) {
+                setTimeout(function () { handleFaint(2); }, 600);
+            } else {
+                updateBattleUI();
+            }
+        }
+
+        function handleFaint(who) {
+            if (who === 2) {
+                battleState.p1.points += 1;
+                showBriefLog("相手のポケモンを倒した！");
+                if (battleState.p1.points >= 3) {
+                    setTimeout(function () { endGame("VICTORY"); }, 800);
+                    return;
+                }
+                battleState.p2.currentIndex = (battleState.p2.currentIndex + 1) % 3;
+                initPokemon(2);
+            } else {
+                battleState.p2.points += 1;
+                showBriefLog("こちらのポケモンが倒れた...");
+                if (battleState.p2.points >= 3) {
+                    setTimeout(function () { endGame("DEFEAT"); }, 800);
+                    return;
+                }
+                battleState.p1.currentIndex = (battleState.p1.currentIndex + 1) % 3;
+                initPokemon(1);
+            }
+            updateBattleUI();
+        }
+
+        function endTurn() {
+            if (battleState.isOver || battleState.turn !== 1) return;
+
+            battleState.turn = 2;
+            showBriefLog("相手のターン...");
+            updateBattleUI();
+
+            setTimeout(function () {
+                if (battleState.p2.energy >= 1) {
+                    const p1State = battleState.p1;
+                    const p2State = battleState.p2;
+                    const p2Card = p2State.deck[p2State.currentIndex];
+                    const damage = p2Card.power + Math.floor(Math.random() * 20);
+
+                    p1State.hp -= damage;
+                    if (p1State.hp < 0) p1State.hp = 0;
+                    p2State.energy -= 1;
+
+                    showBriefLog("相手の " + p2Card.move + "！ " + damage + " ダメージ！");
+
+                    const cardEl = document.getElementById("p2-card-view");
+                    cardEl.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(30px)' }, { transform: 'translateY(0)' }], { duration: 300 });
+
+                    if (p1State.hp === 0) {
+                        setTimeout(function () { handleFaint(1); }, 600);
+                    }
+                }
+
+                battleState.turn = 1;
+                battleState.p1.energy += 1;
+                battleState.p2.energy += 1;
+                updateBattleUI();
+            }, 1000);
+        }
+
+        function updateBattleUI() {
+            // P1
+            const p1 = battleState.p1;
+            const p1Current = p1.deck[p1.currentIndex];
+            document.getElementById("p1-name").innerText = p1Current.name;
+            document.getElementById("p1-hp").innerText = p1.hp;
+            document.getElementById("p1-points").innerText = p1.points;
+
+            const p1Visual = document.getElementById("p1-visual");
+            p1Visual.innerHTML = "";
+            p1Visual.appendChild(createCardVisual(p1Current, true));
+
+            const p1HpPercent = (p1.hp / p1Current.hp) * 100;
+            document.getElementById("p1-hp-fill").style.width = p1HpPercent + "%";
+            document.getElementById("move-name").innerText = p1Current.move;
+
+            renderEnergy("p1-energy", p1.energy);
+
+            // P2
+            const p2 = battleState.p2;
+            const p2Current = p2.deck[p2.currentIndex];
+            document.getElementById("p2-name").innerText = p2Current.name;
+            document.getElementById("p2-hp").innerText = p2.hp;
+            document.getElementById("p2-points").innerText = p2.points;
+
+            const p2Visual = document.getElementById("p2-visual");
+            p2Visual.innerHTML = "";
+            p2Visual.appendChild(createCardVisual(p2Current, true));
+
+            const p2HpPercent = (p2.hp / p2Current.hp) * 100;
+            document.getElementById("p2-hp-fill").style.width = p2HpPercent + "%";
+
+            renderEnergy("p2-energy", p2.energy);
+
+            document.getElementById("attack-btn").disabled = (p1.energy < 1 || battleState.turn !== 1);
+        }
+
+        function renderEnergy(id, count) {
+            const el = document.getElementById(id);
+            el.innerHTML = "";
+            for (let i = 0; i < count; i++) {
+                const orb = document.createElement("div");
+                orb.className = "energy-orb";
+                el.appendChild(orb);
+            }
+        }
+
+        function showScreen(id) {
+            const screens = document.querySelectorAll(".screen");
+            screens.forEach(function (s) { s.classList.remove("active"); });
+            document.getElementById(id).classList.add("active");
+        }
+
+        function showBriefLog(msg) {
+            const overlay = document.getElementById("log-overlay");
+            overlay.innerText = msg;
+            overlay.classList.add("show");
+            setTimeout(function () { overlay.classList.remove("show"); }, 1500);
+        }
+
+        function endGame(text) {
+            battleState.isOver = true;
+            document.getElementById("winner-text").innerText = text;
+            document.getElementById("result-overlay").style.display = "flex";
+            document.getElementById("result-overlay").classList.add("visible");
+        }
+
+        // 初期化（カードの傾きエフェクト登録など、追加可能）
+        window.onload = function () {
+            // 何か初期化が必要ならここに
+        };
+
+    </script>
+</body>
+
+</html>
