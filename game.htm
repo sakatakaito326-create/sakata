@@ -1933,6 +1933,7 @@
 
         function gameOver() {
             clearInterval(timerInterval);
+            resetEnvironment();
 
             // 勝利時の遷移（せんい）ロジック
             if (playerStats.hp > enemyStats.hp) {
@@ -1995,6 +1996,7 @@
         }
 
         function startHiddenBossEncounter(forcedBoss) {
+            resetEnvironment();
             // ランダムに隠しボスを選択（引数があればそれを使用）
             let selectedBoss = forcedBoss;
             if (!selectedBoss) {
@@ -2266,6 +2268,13 @@
         }
 
         // --- 超レアイベント用演出 ---
+
+        function resetEnvironment() {
+            if (scene) {
+                scene.background = new THREE.Color(0x111122);
+                scene.fog = null;
+            }
+        }
 
         function triggerWaterEvent() {
             scene.background = new THREE.Color(0x003366);
