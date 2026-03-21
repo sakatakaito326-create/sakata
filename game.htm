@@ -1897,19 +1897,22 @@
 
             // 2人の中間地点を計算
             const midpointX = (playerStats.x + enemyStats.x) / 2;
+            const midpointY = (playerStats.y + enemyStats.y) / 2;
             const distance = Math.abs(playerStats.x - enemyStats.x);
 
-            // カメラのX座標を中間地点にスムーズに近づける
+            // カメラのX, Y座標を中間地点にスムーズに近づける
             camera.position.x += (midpointX - camera.position.x) * 0.1;
 
+            // Y軸のベースの高さを5とし、平均高度に合わせて動かす
+            const targetY = 5 + midpointY;
+            camera.position.y += (targetY - camera.position.y) * 0.1;
+
             // 距離に応じてズーム（Z座標）を調整
-            // 基本の高さ5, 奥行き12
-            // 距離が広がるほど遠ざかる
             const targetZ = Math.max(12, 8 + distance * 0.8);
             camera.position.z += (targetZ - camera.position.z) * 0.1;
 
-            // カメラの注視点も中間地点に
-            camera.lookAt(midpointX, 2, 0);
+            // カメラの注視点も中間地点に合わせる
+            camera.lookAt(midpointX, 2 + midpointY, 0);
         }
 
     </script>
