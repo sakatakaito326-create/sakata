@@ -1934,25 +1934,44 @@
         function gameOver() {
             clearInterval(timerInterval);
 
-            // 【1戦目終了後】通常の隠しボスへ（テスト用100%）
-            if (playerStats.hp > enemyStats.hp && !enemyStats.isHiddenBoss) {
-                startHiddenBossEncounter();
-                return;
+            // 勝利時の遷移（せんい）ロジック
+            if (playerStats.hp > enemyStats.hp) {
+                const charName = enemyStats.char ? enemyStats.char.name : "";
+                const isEvolved = enemyStats.isEvolved;
+
+                // 【特定撃破トリガー】
+                // パルキアを倒したら大波（ギャラドス）イベントへ
+                if (charName === "パルキア") {
+                    startHiddenBossEncounter("gyarados");
+                    return;
+                }
+                // メガバシャーモを倒したら火山（エンテイ）イベントへ
+                if (charName === "バシャーモ" && isEvolved) {
+                    startHiddenBossEncounter("entei");
+                    return;
+                }
+
+                // 【通常の遷移】
+                // 1戦目終了後 -> 隠しボスへ
+                if (!enemyStats.isHiddenBoss) {
+                    startHiddenBossEncounter();
+                    return;
+                }
+
+                // 2戦目（隠しボス戦）終了後 -> 調整ボタン表示
+                if (enemyStats.isHiddenBoss && !enemyStats.isRareBoss) {
+                    const msg = document.getElementById('message');
+                    msg.style.display = 'block';
+                    msg.innerHTML = "2回戦 突破！ ROUND 2 CLEAR!";
+
+                    const btn = document.getElementById('adjust-btn');
+                    btn.style.display = 'block';
+                    btn.style.pointerEvents = 'auto';
+                    return;
+                }
             }
 
-            // 【2戦目（隠しボス戦）終了後】右側に調整ボタンを表示
-            if (playerStats.hp > enemyStats.hp && enemyStats.isHiddenBoss && !enemyStats.isRareBoss) {
-                const msg = document.getElementById('message');
-                msg.style.display = 'block';
-                msg.innerHTML = "2回戦 突破！ ROUND 2 CLEAR!";
-
-                // 右側にボタンを表示（ちょうせいしますかのぼたん）
-                const btn = document.getElementById('adjust-btn');
-                btn.style.display = 'block';
-                btn.style.pointerEvents = 'auto';
-                return;
-            }
-
+            // 完全終了時（負け、引き分け、または全クリ）の表示
             const msg = document.getElementById('message');
             msg.style.display = 'block'; msg.style.pointerEvents = 'auto';
             if (playerStats.hp > enemyStats.hp) msg.innerHTML = "かち！ WIN";
