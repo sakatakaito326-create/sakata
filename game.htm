@@ -534,6 +534,31 @@
                 evoType: "limit_break",
                 isPlayableOnly: true,
                 sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10160.png"
+            },
+            magikarp: {
+                name: "コイキング", hp: 20, speed: 0.05,
+                moves: ["はねる"], evolution: null,
+                isBoss: true,
+                sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/129.png"
+            },
+            gyarados: {
+                name: "ギャラドス", hp: 300, speed: 0.15,
+                moves: ["はかいこうせん", "かみつく"], evolution: "メガギャラドス", evoType: "mega",
+                isBoss: true,
+                sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/130.png",
+                evoSprites: { mega: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10006.png" }
+            },
+            entei: {
+                name: "エンテイ", hp: 350, speed: 0.20,
+                moves: ["かえんほうしゃ", "だいもんじ"], evolution: null,
+                isBoss: true,
+                sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/244.png"
+            },
+            eternatus_eternamax: {
+                name: "ムゲンダイナ", hp: 1500, speed: 0.10,
+                moves: ["ムゲンダイビーム", "ヘドロウェーブ"], evolution: null,
+                isBoss: true,
+                sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/890.png"
             }
         };
 
@@ -943,6 +968,10 @@
             else if (charName === "バシャーモ") blazeKick(attacker, target, mesh);
             else if (charName === "ダークルギア") launchProjectile(attacker, target, 0x222222, "dark_aura"); // エアロブラスト代用
             else if (charName === "サトシピカチュウ") pikachuMove(attacker, target, mesh);
+            else if (charName === "ムゲンダイナ") eternatusMove(attacker, target, mesh);
+            else if (charName === "ギャラドス") launchProjectile(attacker, target, 0xffffff, "beam");
+            else if (charName === "エンテイ") launchProjectile(attacker, target, 0xff4400, "fire");
+            else if (charName === "コイキング") { /* 何もしない */ }
 
             // 伝説のポケモン(隠しボス)の攻撃後の隙は通常3秒 (60fps * 3 = 180)
             if (["アーマードミュウツー", "パルキア", "ダークライ", "ダークルギア", "メガミュウツーX", "ギラティナ", "ゼラオラ"].includes(currentName)) {
@@ -1847,13 +1876,17 @@
 
             if (playerStats.hp <= 0) gameOver();
             if (enemyStats.hp <= 0) {
-                // ギラティナ・ゼラオラの復活（第2形態）処理
-                if (enemyStats.char && (enemyStats.char.name === "ギラティナ" || enemyStats.char.name === "ゼラオラ") && !enemyStats.isRevived) {
+                // ボスの復活・メガシンカ処理
+                const bossNames = ["ギラティナ", "ゼラオラ", "ギャラドス"];
+                if (enemyStats.char && bossNames.includes(enemyStats.char.name) && !enemyStats.isRevived) {
                     enemyStats.isRevived = true;
                     enemyStats.cooldown = 200; // 復活中の硬直
-                    displayAction(enemyStats, enemyStats.char.name === "ギラティナ" ? "オリジンフォルムに 変化！" : "メガシンカ！");
+                    let evoMsg = "進化！";
+                    if (enemyStats.char.name === "ギラティナ") evoMsg = "オリジンフォルムに 変化！";
+                    else if (enemyStats.char.name === "ゼラオラ") evoMsg = "メガシンカ！";
+                    else if (enemyStats.char.name === "ギャラドス") evoMsg = "メカシンカ！";
 
-                    // 派手な復活演出
+                    displayAction(enemyStats, evoMsg);
                     createEffect(enemyStats.x, enemyStats.y + 2, 0xffffff, 8.0);
 
                     setTimeout(() => {
@@ -1861,18 +1894,25 @@
                         if (enemyStats.char.name === "ギラティナ") {
                             sprite.material.map = textureLoader.load(enemyStats.char.evoSprites.origin);
                             enemyStats.hp = 490;
-                        } else {
-                            // ゼラオラはしっかりメガシンカ後の画像を読み込む
+                        } else if (enemyStats.char.name === "ゼラオラ") {
                             sprite.material.map = textureLoader.load(enemyStats.char.evoSprites.mega);
-                            enemyStats.hp = 390; // ゼラオラのメガシンカは40増やす (350+40 or 前の350から。リクエストは390)
-                            // ゼラオラはオーラを纏わせる
+                            enemyStats.hp = 390;
                             sprite.material.color.set(0x00ffff);
+                        } else if (enemyStats.char.name === "ギャラドス") {
+                            sprite.material.map = textureLoader.load(enemyStats.char.evoSprites.mega);
+                            enemyStats.hp = 350; // メガギャラドス
+                            sprite.material.color.set(0x8888ff);
                         }
                         updateUI();
                     }, 1000);
                     return;
                 }
-                playFaintMotion(enemy);
+
+                if (enemyStats.char && enemyStats.char.name === "ムゲンダイナ") {
+                    playEternatusFaint(enemy);
+                } else {
+                    playFaintMotion(enemy);
+                }
                 gameOver();
             }
         }
@@ -1937,8 +1977,17 @@
 
         function startHiddenBossEncounter(forcedBoss) {
             // ランダムに隠しボスを選択（引数があればそれを使用）
-            const bosses = ["mewtwo", "palkia", "darkrai"];
-            const selectedBoss = forcedBoss || bosses[Math.floor(Math.random() * bosses.length)];
+            let selectedBoss = forcedBoss;
+            if (!selectedBoss) {
+                const rand = Math.random();
+                if (rand < 0.01) selectedBoss = "gyarados";
+                else if (rand < 0.02) selectedBoss = "entei";
+                else if (rand < 0.03) selectedBoss = "eternatus_eternamax";
+                else {
+                    const bosses = ["mewtwo", "palkia", "darkrai"];
+                    selectedBoss = bosses[Math.floor(Math.random() * bosses.length)];
+                }
+            }
 
             // 敵のステータスを隠しボスに更新
             enemyStats.char = POKEMON_DATA[selectedBoss];
@@ -1998,9 +2047,41 @@
                         sprite.position.y = 2.0;
                         createEffect(enemyStats.x, 2, 0xffff00, 5.0);
                     }
-                }, 50);
+                }, 100);
 
-            } else {
+            } else if (selectedBoss === "gyarados") {
+                // 大波演出
+                msg.innerHTML = `<span style="color:#00ffff; text-shadow: 0 0 10px #000; font-size:40px;">大波が 押し寄せる！</span>`;
+                triggerWaterEvent();
+                setTimeout(() => {
+                    sprite.material.opacity = 1;
+                    sprite.scale.set(6, 6, 1);
+                    sprite.position.y = 3.0;
+                    // コイキングも出す
+                    spawnEnemyMinions("magikarp", 3);
+                }, 2000);
+
+            } else if (selectedBoss === "entei") {
+                // 火山演出
+                msg.innerHTML = `<span style="color:#ff4500; text-shadow: 0 0 10px #000; font-size:40px;">火山が 噴火した！ <br> エンテイが 現れる！</span>`;
+                triggerVolcanoEvent();
+                setTimeout(() => {
+                    sprite.material.opacity = 1;
+                    sprite.scale.set(4, 4, 1);
+                    sprite.position.y = 2.0;
+                }, 2000);
+
+            } else if (selectedBoss === "eternatus_eternamax") {
+                // ブラックナイト演出
+                msg.innerHTML = `<span style="color:#ff00ff; text-shadow: 0 0 10px #fff; font-size:40px;">ブラックナイト 到来！ <br> ムゲンダイナが 降臨する！</span>`;
+                triggerBlackNightEvent();
+                setTimeout(() => {
+                    sprite.material.opacity = 1;
+                    sprite.scale.set(12, 12, 1);
+                    sprite.position.y = 8.0; // ムゲンダイナは空を飛ぶ
+                }, 2500);
+            }
+            else {
                 // 通常の隠しボス演出
                 msg.innerHTML = `<span style="color:red; font-size:40px;">WARNING!!<br>${enemyStats.char.name} があらわれた！</span>`;
                 sprite.material.opacity = 1;
@@ -2163,6 +2244,171 @@
             web.position.set(attacker.x, attacker.y + 1, 0.5);
             scene.add(web);
             setTimeout(() => scene.remove(web), 100);
+        }
+
+        // --- 超レアイベント用演出 ---
+
+        function triggerWaterEvent() {
+            scene.background = new THREE.Color(0x003366);
+            scene.fog = new THREE.FogExp2(0x004488, 0.05);
+
+            // 波のメッシュ（簡易的に板を動かす）
+            const waveGeo = new THREE.PlaneGeometry(50, 10);
+            const waveMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+            const wave = new THREE.Mesh(waveGeo, waveMat);
+            wave.rotation.x = -Math.PI / 2;
+            wave.position.set(0, 0.1, 10);
+            scene.add(wave);
+
+            function moveWave() {
+                wave.position.z -= 0.2;
+                if (wave.position.z > -20) requestAnimationFrame(moveWave);
+                else scene.remove(wave);
+            }
+            moveWave();
+        }
+
+        function triggerVolcanoEvent() {
+            scene.background = new THREE.Color(0x441100);
+            scene.fog = new THREE.FogExp2(0x662200, 0.05);
+            triggerShake();
+
+            // 火の粉エフェクトを継続的に発生
+            const interval = setInterval(() => {
+                if (!enemyStats.char || enemyStats.char.name !== "エンテイ") {
+                    clearInterval(interval);
+                    return;
+                }
+                createEffect((Math.random() - 0.5) * 20, 0, 0xff4500, 0.5);
+            }, 200);
+        }
+
+        function triggerBlackNightEvent() {
+            scene.background = new THREE.Color(0x220033);
+            scene.fog = new THREE.FogExp2(0x330044, 0.03);
+
+            // 雷演出
+            const interval = setInterval(() => {
+                if (!enemyStats.char || enemyStats.char.name !== "ムゲンダイナ") {
+                    clearInterval(interval);
+                    scene.fog = null;
+                    return;
+                }
+                if (Math.random() < 0.1) {
+                    const x = (Math.random() - 0.5) * 30;
+                    drawLightningLine(x, 20, x + (Math.random() - 0.5) * 5, 0, 0xff00ff);
+                }
+            }, 100);
+        }
+
+        function spawnEnemyMinions(charKey, count) {
+            for (let i = 0; i < count; i++) {
+                const minion = createFighter(charKey);
+                minion.position.set(enemyStats.x + (Math.random() - 0.5) * 5, 0, 0.5);
+                scene.add(minion);
+                // 簡易的なお供AI（跳ねるだけ）
+                function hop() {
+                    if (minion.parent) {
+                        minion.position.y += 0.1;
+                        setTimeout(() => { minion.position.y -= 0.1; }, 200);
+                        setTimeout(hop, 1000 + Math.random() * 2000);
+                    }
+                }
+                hop();
+            }
+        }
+
+        // --- ムゲンダイナ専用AI ---
+        function eternatusMove(attacker, target, mesh) {
+            const rand = Math.random();
+            if (rand < 0.7) {
+                // 予兆付きムゲンダイビーム
+                displayAction(attacker, "ムゲンダイビーム(予兆)");
+                attacker.cooldown = 200;
+
+                // 攻撃範囲の表示 (赤いライン)
+                const indicatorGeo = new THREE.PlaneGeometry(30, 1);
+                const indicatorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.3 });
+                const indicator = new THREE.Mesh(indicatorGeo, indicatorMat);
+                indicator.rotation.x = -Math.PI / 2;
+                indicator.position.set(0, 0.1, 0);
+                scene.add(indicator);
+
+                setTimeout(() => {
+                    scene.remove(indicator);
+                    displayAction(attacker, "ムゲンダイビーム！！");
+                    // 極太ビーム
+                    const beamGeo = new THREE.CylinderGeometry(2, 2, 40, 16);
+                    const beamMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.8 });
+                    const beam = new THREE.Mesh(beamGeo, beamMat);
+                    beam.rotation.z = Math.PI / 2;
+                    beam.position.set(0, attacker.y, 0);
+                    scene.add(beam);
+
+                    // ダメージ判定（プレイヤーが地上にいたら大ダメージ）
+                    if (target.y < 2.0) {
+                        target.hp -= 80;
+                        updateUI();
+                        createEffect(target.x, target.y + 1, 0xff00ff, 5.0);
+                    }
+
+                    setTimeout(() => scene.remove(beam), 500);
+                }, 1500);
+
+            } else {
+                displayAction(attacker, "ヘドロウェーブ");
+                // 四方に弾を散らす
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    launchProjectileAtAngle(attacker, angle, 0x880088);
+                }
+            }
+        }
+
+        function launchProjectileAtAngle(attacker, angle, color) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: color }));
+            p.position.set(attacker.x, attacker.y, 0);
+            scene.add(p);
+            const vx = Math.cos(angle) * 0.2, vy = Math.sin(angle) * 0.2;
+            let life = 100;
+            function move() {
+                p.position.x += vx; p.position.y += vy;
+                if (--life > 0) requestAnimationFrame(move); else scene.remove(p);
+            }
+            move();
+        }
+
+        function playEternatusFaint(mesh) {
+            displayAction(enemyStats, "ダイマックスほう(最後のあがき)");
+            // 空にビーム
+            drawLightningLine(enemyStats.x, enemyStats.y, enemyStats.x, 30, 0xff00ff);
+
+            setTimeout(() => {
+                displayAction(enemyStats, "りゅうせいぐん！！");
+                // 大量の隕石
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        const x = (Math.random() - 0.5) * 30;
+                        const meteor = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff4500 }));
+                        meteor.position.set(x, 20, 0);
+                        scene.add(meteor);
+                        function drop() {
+                            meteor.position.y -= 0.5;
+                            if (meteor.position.y > 0) requestAnimationFrame(drop);
+                            else {
+                                createEffect(x, 0, 0xff4500, 2.0);
+                                // 次のポケモンへのダメージ（とりあえずプレイヤーにダメージ）
+                                if (Math.abs(playerStats.x - x) < 2.0) {
+                                    playerStats.hp -= 10;
+                                    updateUI();
+                                }
+                                scene.remove(meteor);
+                            }
+                        }
+                        drop();
+                    }, i * 100);
+                }
+            }, 1000);
         }
 
         function spawnAlly() {
