@@ -416,6 +416,7 @@
             <div><span class="key-badge">R</span> 避ける</div>
             <div><span class="key-badge">X</span> 進化</div>
             <div><span class="key-badge">U</span> 連続攻撃</div>
+            <div><span class="key-badge">F</span> 究極技(メガ時のみ)</div>
         </div>
 
         <div id="message">WIN!</div>
@@ -536,9 +537,13 @@
         const playerStats = {
             hp: 100, x: -4, y: 0, vy: 0,
             isJumping: false, isAttacking: false, isGuarding: false, isDashing: false,
-            cooldown: 0, char: null, evoCount: 0, isEvolved: false
+            cooldown: 0, char: null, evoCount: 0, isEvolved: false,
+            usedUltimate: false
         };
-        const enemyStats = { hp: 100, x: 4, y: 0, vy: 0, isJumping: false, isAttacking: false, cooldown: 0, char: null };
+        const enemyStats = {
+            hp: 100, x: 4, y: 0, vy: 0, isJumping: false, isAttacking: false,
+            cooldown: 0, char: null, usedUltimate: false
+        };
 
         function selectChar(id) {
             selectedChar = id;
@@ -734,6 +739,9 @@
             if (keys['KeyX'] && !playerStats.isEvolved && playerStats.char.evolution) {
                 triggerEvolution(playerStats, player);
             }
+            if (keys['KeyF'] && playerStats.isEvolved && !playerStats.usedUltimate && playerStats.cooldown <= 0) {
+                useUltimateMove(playerStats, enemyStats, player);
+            }
             playerStats.vy -= 0.01;
             playerStats.y += playerStats.vy;
             if (playerStats.y <= 0) { playerStats.y = 0; playerStats.vy = 0; playerStats.isJumping = false; }
@@ -790,6 +798,11 @@
             // 進化（体力が半分以下で進化可能なら進化する）
             if (enemyStats.hp <= enemyStats.char.hp / 2 && !enemyStats.isEvolved && enemyStats.char.evolution && Math.random() < 0.1) {
                 triggerEvolution(enemyStats, enemy);
+            }
+
+            // CPUの究極技（進化していて、体力が減っていて、一度も使っていない時に低確率で発動）
+            if (enemyStats.isEvolved && !enemyStats.usedUltimate && enemyStats.hp < enemyStats.char.hp * 0.4 && Math.random() < 0.05 && enemyStats.cooldown <= 0) {
+                useUltimateMove(enemyStats, playerStats, enemy);
             }
 
             enemyStats.vy -= 0.01;
@@ -1336,25 +1349,43 @@
             // 一回だけZ技を使う
             if (!attacker.usedZMove && attacker.hp < attacker.char.hp * 0.4) {
                 attacker.usedZMove = true;
-                attacker.cooldown = 180;
+                attacker.cooldown = 240;
                 displayAction(attacker, "全力無双激烈拳(Z技)");
 
                 // 画面下に注意してくださいとながれる
                 const warn = document.getElementById('warning-bar');
                 warn.style.display = 'block';
 
+                // 溜め演出
+                let chargeFrame = 0;
+                function chargeEffect() {
+                    chargeFrame++;
+                    // パーティクルが集まる演出
+                    for (let i = 0; i < 3; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 3.0;
+                        const px = attacker.x + Math.cos(angle) * dist;
+                        const py = attacker.y + 1 + Math.sin(angle) * dist;
+                        createEffect(px, py, 0x00ffff, 0.3);
+                        // パーティクルを自分の方へ動かす (createEffect自体はランダムなので、個別に作る)
+                        createChargeParticle(px, py, attacker.x, attacker.y + 1);
+                    }
+                    if (chargeFrame < 200) requestAnimationFrame(chargeEffect);
+                }
+                chargeEffect();
+
                 setTimeout(() => {
                     warn.style.display = 'none';
                     // 超強力突進
-                    dashAttackLogic(attacker, target, mesh, 60, "Z-MOVE");
+                    dashAttackLogic(attacker, target, mesh, 70, "Z-MOVE");
                 }, 4000);
                 return;
             }
 
             if (rand < 0.6) {
-                // プラズマフィスト: ダッシュ攻撃と同じことをして威力は調整(15)
+                // プラズマフィスト (稲妻画像エフェクト付き)
                 displayAction(attacker, "プラズマフィスト");
-                dashAttackLogic(attacker, target, mesh, 15, "PLASMA");
+                drawLightningAttack(attacker, target);
             } else {
                 // かみなりパンチ
                 displayAction(attacker, "かみなりパンチ");
@@ -1368,6 +1399,173 @@
                     }
                 }, 100);
             }
+        }
+
+        function createChargeParticle(sx, sy, tx, ty) {
+            const geo = new THREE.SphereGeometry(0.1, 4, 4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(sx, sy, 0.5);
+            scene.add(p);
+            let frame = 0;
+            function move() {
+                frame++;
+                p.position.x += (tx - p.position.x) * 0.1;
+                p.position.y += (ty - p.position.y) * 0.1;
+                if (frame < 30) requestAnimationFrame(move); else scene.remove(p);
+            }
+            move();
+        }
+
+        function drawLightningAttack(attacker, target) {
+            attacker.isAttacking = true;
+            attacker.cooldown = 50;
+            const segments = [];
+            const count = 5;
+            let curX = attacker.x;
+            let curY = attacker.y + 1;
+            const targetX = target.x;
+            const targetY = target.y + 1;
+
+            const material = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 3 });
+
+            function nextSegment(i) {
+                if (i >= count) {
+                    // ヒット判定
+                    if (Math.abs(curX - targetX) < 2.0) {
+                        target.hp -= 15;
+                        applyKnockback(attacker, target);
+                        createEffect(targetX, targetY, 0x00ffff, 2.0);
+                        updateUI();
+                    }
+                    attacker.isAttacking = false;
+                    // 一定時間後に雷を消す
+                    setTimeout(() => {
+                        segments.forEach(s => scene.remove(s));
+                    }, 200);
+                    return;
+                }
+
+                const nxtX = curX + (targetX - curX) / count + (Math.random() - 0.5) * 1.5;
+                const nxtY = curY + (targetY - curY) / count + (Math.random() - 0.5) * 1.5;
+
+                const points = [new THREE.Vector3(curX, curY, 0.5), new THREE.Vector3(nxtX, nxtY, 0.5)];
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geo, material);
+                scene.add(line);
+                segments.push(line);
+
+                curX = nxtX; curY = nxtY;
+                setTimeout(() => nextSegment(i + 1), 30);
+            }
+            nextSegment(0);
+        }
+
+        // --- 究極技の分岐 ---
+        function useUltimateMove(attacker, target, mesh) {
+            const charName = attacker.char.name;
+            const evolvedName = attacker.char.evolution;
+            attacker.usedUltimate = true;
+            attacker.isAttacking = true;
+            attacker.cooldown = 120;
+
+            if (evolvedName === "サトシゲッコウガ") {
+                displayAction(attacker, "究極技：巨大水手裏剣");
+                launchGiantProjectile(attacker, target, 0x00ffff, "shuriken");
+            } else if (evolvedName === "メガルカリオZ") {
+                displayAction(attacker, "究極技：巨大波動弾");
+                launchGiantProjectile(attacker, target, 0xaaaaff, "aura");
+            } else if (evolvedName === "メガバシャーモ") {
+                displayAction(attacker, "究極技：超火力ブレイズキック");
+                ultimateBlazeKick(attacker, target, mesh);
+            } else if (evolvedName === "メガシンカ" && charName === "エルレイド") {
+                displayAction(attacker, "究極技：三つの剣術");
+                threeSwordTechnique(attacker, target, mesh);
+            } else {
+                // 究極技がない場合は通常攻撃（または何もしない）
+                attacker.usedUltimate = false; // フラグ戻す
+                attacker.isAttacking = false;
+                attacker.cooldown = 0;
+            }
+        }
+
+        function launchGiantProjectile(attacker, target, color, type) {
+            const geo = type === "shuriken" ? new THREE.TorusGeometry(1.5, 0.2, 8, 16) : new THREE.SphereGeometry(1.5, 16, 16);
+            const p = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 }));
+            p.position.set(attacker.x, attacker.y + 1, 0.5);
+            scene.add(p);
+            const dir = (attacker.x < target.x) ? 1 : -1;
+            let life = 100;
+
+            function moveP() {
+                p.position.x += 0.2 * dir;
+                p.rotation.z += 0.2;
+                p.rotation.y += 0.1;
+
+                const d = Math.abs(p.position.x - target.x);
+                if (d < 2.0) {
+                    let damage = 80; // 超大ダメージ
+                    if (target.isGuarding) damage = 16;
+                    target.hp -= damage;
+                    createEffect(target.x, target.y + 1, color, 5.0);
+                    updateUI();
+                    scene.remove(p);
+                    attacker.isAttacking = false;
+                    return;
+                }
+                if (--life > 0) requestAnimationFrame(moveP); else { scene.remove(p); attacker.isAttacking = false; }
+            }
+            moveP();
+        }
+
+        function ultimateBlazeKick(attacker, target, mesh) {
+            const dir = (attacker.x < target.x) ? 1 : -1;
+            const startX = attacker.x;
+            const targetX = target.x - (1.0 * dir);
+
+            let frame = 0;
+            function dash() {
+                frame++;
+                attacker.x = startX + (targetX - startX) * (frame / 10);
+                createEffect(attacker.x, attacker.y, 0xff4500, 0.5);
+                if (frame < 10) requestAnimationFrame(dash);
+                else {
+                    // ヒット
+                    target.hp -= 80;
+                    target.vy = 0.8; // 超高く打ち上げる
+                    target.isJumping = true;
+                    createEffect(target.x, target.y + 1, 0xff0000, 6.0);
+                    updateUI();
+                    attacker.isAttacking = false;
+                }
+            }
+            dash();
+        }
+
+        function threeSwordTechnique(attacker, target, mesh) {
+            // 相手のそばへテレポート
+            const dir = (attacker.x < target.x) ? 1 : -1;
+            attacker.x = target.x - (1.5 * dir);
+
+            // 相手を5秒間ひるませる（拘束）
+            target.cooldown = 300; // 60fps * 5 = 300
+
+            let hits = 0;
+            function attackCycle() {
+                hits++;
+                playAttackMotion(mesh);
+                target.hp -= 25;
+                createEffect(target.x, target.y + 1, 0x00ff00, 3.0);
+                updateUI();
+                triggerShake();
+
+                if (hits < 3) {
+                    setTimeout(attackCycle, 1500); // 1.5秒ごとに攻撃
+                } else {
+                    attacker.isAttacking = false;
+                }
+            }
+            attackCycle();
         }
 
         // ダッシュ攻撃の共通ロジック
