@@ -530,7 +530,8 @@
             },
             pikachu_ash: {
                 name: "サトシピカチュウ", hp: 400, speed: 0.22,
-                moves: ["10万ボルト", "1000万ボルト"], evolution: null,
+                moves: ["10万ボルト", "1000万ボルト"], evolution: "サトシピカチュウ(限界突破)",
+                evoType: "limit_break",
                 isPlayableOnly: true,
                 sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10160.png"
             }
@@ -1095,7 +1096,8 @@
             // サトシピカチュウの場合はボルテッカー
             if (attacker.char && attacker.char.name === "サトシピカチュウ") {
                 displayAction(attacker, "ボルテッカー");
-                voltTackle(attacker, target, mesh, 35, false);
+                const baseDamage = 35;
+                voltTackle(attacker, target, mesh, baseDamage * (attacker.attackMult || 1.0), false);
                 return;
             }
 
@@ -1138,7 +1140,7 @@
             attacker.cooldown = 45;
             playAttackMotion(mesh);
             if (Math.abs(attacker.x - target.x) < 2.0) {
-                let damage = isPikachu ? 40 : 18;
+                let damage = isPikachu ? (40 * (attacker.attackMult || 1.0)) : 18;
                 if (target.isGuarding) {
                     damage = Math.floor(damage * 0.2);
                 } else {
@@ -1569,7 +1571,7 @@
                 threeSwordTechnique(attacker, target, mesh);
             } else if (charName === "サトシピカチュウ") {
                 displayAction(attacker, "究極技：高火力ボルテッカー");
-                voltTackle(attacker, target, mesh, 120, true);
+                voltTackle(attacker, target, mesh, 120 * (attacker.attackMult || 1.0), true);
             } else {
                 // 究極技がない場合は通常攻撃（または何もしない）
                 attacker.usedUltimate = false; // フラグ戻す
@@ -1766,6 +1768,10 @@
                 msg.style.display = 'block';
                 msg.innerHTML = `<span style="color:black; font-size:40px; text-shadow: 2px 2px 5px red;">悪夢の具現化<br>ダークルギア</span>`;
                 setTimeout(() => { msg.style.display = 'none'; }, 2000);
+            } else if (type === "サトシピカチュウ") {
+                stats.attackMult = 1.5;
+                sprite.material.color.set(0xffff88); // 黄金色のオーラ
+                document.getElementById('debug-info').innerText = "サトシピカチュウ 限界突破！ 攻撃力1.5倍！";
             }
 
             triggerShake();
@@ -2076,11 +2082,12 @@
 
         function thunderbolt(attacker, target) {
             const color = 0xffff00;
+            const damage = 3 * (attacker.attackMult || 1.0);
             for (let i = 0; i < 5; i++) {
                 setTimeout(() => {
                     drawLightningLine(attacker.x, attacker.y + 1, target.x, target.y + 1, color);
                     if (Math.abs(attacker.x - target.x) < 5.0) {
-                        target.hp -= 3;
+                        target.hp -= damage;
                         updateUI();
                         createEffect(target.x, target.y + 1, color, 1.0);
                     }
@@ -2090,12 +2097,13 @@
 
         function tenMillionVoltThunderbolt(attacker, target) {
             const colors = [0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff];
+            const damage = 2 * (attacker.attackMult || 1.0);
             attacker.cooldown = 100;
             let count = 0;
             const interval = setInterval(() => {
                 const color = colors[count % colors.length];
                 drawLightningLine(attacker.x, attacker.y + 1, target.x, target.y + 1, color);
-                target.hp -= 2;
+                target.hp -= damage;
                 updateUI();
                 createEffect(target.x, target.y + 1, color, 2.0);
                 count++;
