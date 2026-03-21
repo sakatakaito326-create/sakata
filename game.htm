@@ -1519,27 +1519,62 @@
         }
 
         function ultimateBlazeKick(attacker, target, mesh) {
-            const dir = (attacker.x < target.x) ? 1 : -1;
+            attacker.isAttacking = true;
+            attacker.cooldown = 180;
             const startX = attacker.x;
-            const targetX = target.x - (1.0 * dir);
+            const startY = attacker.y;
 
             let frame = 0;
-            function dash() {
+            // フェーズ1: 上昇
+            function ascend() {
                 frame++;
-                attacker.x = startX + (targetX - startX) * (frame / 10);
+                attacker.y = startY + (12 - startY) * (frame / 20); // 高度12まで上昇
                 createEffect(attacker.x, attacker.y, 0xff4500, 0.5);
-                if (frame < 10) requestAnimationFrame(dash);
-                else {
-                    // ヒット
-                    target.hp -= 80;
-                    target.vy = 0.8; // 超高く打ち上げる
-                    target.isJumping = true;
-                    createEffect(target.x, target.y + 1, 0xff0000, 6.0);
-                    updateUI();
-                    attacker.isAttacking = false;
+                if (frame < 20) {
+                    requestAnimationFrame(ascend);
+                } else {
+                    frame = 0;
+                    setTimeout(moveToTarget, 200); // 少し溜めてから移動
                 }
             }
-            dash();
+
+            // フェーズ2: ターゲットの真上へ移動
+            function moveToTarget() {
+                frame++;
+                const currentTargetX = target.x;
+                attacker.x += (currentTargetX - attacker.x) * 0.2;
+                createEffect(attacker.x, attacker.y, 0xff8c00, 0.8);
+                if (frame < 20) {
+                    requestAnimationFrame(moveToTarget);
+                } else {
+                    frame = 0;
+                    setTimeout(diveKick, 100); // 急降下開始
+                }
+            }
+
+            // フェーズ3: 急降下攻撃
+            function diveKick() {
+                frame++;
+                attacker.y -= 1.0; // 急速に落下
+                createEffect(attacker.x, attacker.y + 1, 0xff0000, 1.0);
+
+                // 当たり判定 (地面か相手に当たったら終了)
+                if (attacker.y <= target.y + 1 || attacker.y <= 0) {
+                    attacker.y = Math.max(0, attacker.y);
+                    // ヒット
+                    target.hp -= 80;
+                    target.vy = 0.5; // 少し跳ね返す
+                    applyKnockback(attacker, target);
+                    createEffect(target.x, target.y + 1, 0xff0000, 8.0);
+                    updateUI();
+                    triggerShake();
+                    attacker.isAttacking = false;
+                } else {
+                    requestAnimationFrame(diveKick);
+                }
+            }
+
+            ascend();
         }
 
         function threeSwordTechnique(attacker, target, mesh) {
