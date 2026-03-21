@@ -371,6 +371,10 @@
                 <h3>ミュウツー</h3>
                 <p>念動力 & メガシンカ</p>
             </div>
+            <div class="char-card" id="card-blaziken" onclick="selectChar('blaziken')">
+                <h3>バシャーモ</h3>
+                <p>ブレイズキック & メガシンカ</p>
+            </div>
         </div>
         <button id="start-btn" onclick="startGame()">バトル開始！</button>
     </div>
@@ -510,6 +514,14 @@
                 isBoss: true,
                 sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/807.png",
                 evoSprites: { mega: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/807.png" }
+            },
+            blaziken: {
+                name: "バシャーモ", hp: 115, speed: 0.16,
+                moves: ["ブレイズキック"], evolution: "メガバシャーモ", evoType: "mega",
+                sprite: "./blaziken.png",
+                evoSprites: {
+                    mega: "./mega_blaziken.png"
+                }
             }
         };
 
@@ -829,6 +841,7 @@
             else if (charName === "ダークライ") darkraiMove(attacker, target, mesh);
             else if (charName === "ギラティナ") giratinaMove(attacker, target, mesh);
             else if (charName === "ゼラオラ") zeraoraMove(attacker, target, mesh);
+            else if (charName === "バシャーモ") blazeKick(attacker, target, mesh);
             else if (charName === "ダークルギア") launchProjectile(attacker, target, 0x222222, "dark_aura"); // エアロブラスト代用
 
             // 伝説のポケモン(隠しボス)の攻撃後の隙は通常3秒 (60fps * 3 = 180)
@@ -1118,6 +1131,56 @@
             }
         }
 
+        // バシャーモ専用：ブレイズキック (Blaze Kick)
+        function blazeKick(attacker, target, mesh) {
+            displayAction(attacker, "ブレイズキック");
+            attacker.isAttacking = true;
+            attacker.cooldown = 45;
+            playAttackMotion(mesh);
+
+            const dir = (attacker.x < target.x) ? 1 : -1;
+            const targetX = target.x - (1.2 * dir); // 相手の少し手前まで飛ぶ
+
+            // 炎のエフェクトを出す
+            createEffect(attacker.x, attacker.y + 1, 0xff4500, 2.0);
+
+            // 高速移動（飛びかかる）
+            let frame = 0;
+            const startX = attacker.x;
+            const dist = targetX - startX;
+
+            function moveKick() {
+                frame++;
+                // 10フレームで移動
+                attacker.x = startX + dist * (frame / 10);
+                // 足元に炎
+                if (frame % 2 === 0) createEffect(attacker.x, attacker.y, 0xff8c00, 0.5);
+
+                if (frame < 10) {
+                    requestAnimationFrame(moveKick);
+                } else {
+                    // 移動完了後に攻撃判定
+                    if (Math.abs(attacker.x - target.x) < 2.5) {
+                        let damage = attacker === playerStats ? (attacker.isEvolved ? 35 : 20) : (attacker.isEvolved ? 20 : 10);
+                        if (target.isGuarding) {
+                            damage = Math.floor(damage * 0.2);
+                        } else {
+                            // 強いノックバック
+                            const knockbackDir = (attacker.x < target.x) ? 1 : -1;
+                            target.x += 3.0 * knockbackDir;
+                            target.vy = 0.2; // 少し浮かす
+                            target.isJumping = true;
+                        }
+                        target.hp -= damage;
+                        createEffect(target.x, target.y + 1, 0xff0000, 4.0);
+                        updateUI();
+                    }
+                    setTimeout(function () { attacker.isAttacking = false; }, 200);
+                }
+            }
+            moveKick();
+        }
+
         function alcremieMove(attacker, target) {
             attacker.cooldown = 20;
             createEffect(attacker.x, attacker.y, 0xffffff, 2.0);
@@ -1323,6 +1386,10 @@
             } else if (type === "エルレイド") {
                 sprite.material.map = textureLoader.load(stats.char.evoSprites.mega);
                 document.getElementById('debug-info').innerText = "メガエルレイド！";
+            } else if (type === "バシャーモ") {
+                sprite.material.map = textureLoader.load(stats.char.evoSprites.mega);
+                document.getElementById('debug-info').innerText = "メガバシャーモ！ 加速！";
+                stats.speed *= 1.6; // 移動速度が速くなる
             } else if (type === "アーマードミュウツー") {
                 sprite.material.map = textureLoader.load(stats.char.evoSprites.mega);
                 document.getElementById('debug-info').innerText = "メガミュウツーX！";
@@ -1583,7 +1650,29 @@
         function animate() {
             requestAnimationFrame(animate);
             update();
+            updateCamera();
             renderer.render(scene, camera);
+        }
+
+        // ダイナミックカメラの更新 (Dynamic Camera)
+        function updateCamera() {
+            if (!player || !enemy) return;
+
+            // 2人の中間地点を計算
+            const midpointX = (playerStats.x + enemyStats.x) / 2;
+            const distance = Math.abs(playerStats.x - enemyStats.x);
+
+            // カメラのX座標を中間地点にスムーズに近づける
+            camera.position.x += (midpointX - camera.position.x) * 0.1;
+
+            // 距離に応じてズーム（Z座標）を調整
+            // 基本の高さ5, 奥行き12
+            // 距離が広がるほど遠ざかる
+            const targetZ = Math.max(12, 8 + distance * 0.8);
+            camera.position.z += (targetZ - camera.position.z) * 0.1;
+
+            // カメラの注視点も中間地点に
+            camera.lookAt(midpointX, 2, 0);
         }
 
     </script>
