@@ -510,7 +510,7 @@
                 evoSprites: { origin: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/487-origin.png" }
             },
             zeraora: {
-                name: "ゼラオラ", hp: 350, speed: 0.28,
+                name: "ゼラオラ", hp: 370, speed: 0.28,
                 moves: ["プラズマフィスト", "かみなりパンチ"], evolution: "メガシンカ", evoType: "revive",
                 isBoss: true,
                 sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/807.png",
@@ -527,7 +527,7 @@
         };
 
         let scene, camera, renderer;
-        let player, enemy, floor;
+        let player, enemy, floor, ally;
         const keys = {};
 
         // 状態（じょうたい）データ
@@ -543,6 +543,10 @@
         const enemyStats = {
             hp: 100, x: 4, y: 0, vy: 0, isJumping: false, isAttacking: false,
             cooldown: 0, char: null, usedUltimate: false
+        };
+        const allyStats = {
+            hp: 100, x: -6, y: 0, vy: 0, isJumping: false, isAttacking: false,
+            cooldown: 0, char: null, isActive: false
         };
 
         function selectChar(id) {
@@ -748,7 +752,27 @@
             if (playerStats.cooldown > 0) playerStats.cooldown--;
             player.position.set(playerStats.x, playerStats.y, 0);
             updateCPU();
+            if (allyStats.isActive) updateAlly();
             handleCollision();
+        }
+
+        function updateAlly() {
+            if (enemyStats.hp <= 0) return;
+            const dist = enemyStats.x - allyStats.x;
+            const speed = allyStats.char.speed * 0.5;
+
+            if (Math.abs(dist) > 3.0) {
+                allyStats.x += (dist > 0 ? 1 : -1) * speed;
+            } else {
+                if (allyStats.cooldown <= 0 && !allyStats.isAttacking) {
+                    useMove(allyStats, enemyStats, ally);
+                }
+            }
+            allyStats.vy -= 0.01;
+            allyStats.y += allyStats.vy;
+            if (allyStats.y <= 0) { allyStats.y = 0; allyStats.vy = 0; }
+            if (allyStats.cooldown > 0) allyStats.cooldown--;
+            ally.position.set(allyStats.x, allyStats.y, 0);
         }
 
         function updateCPU() {
@@ -819,9 +843,19 @@
                 playerStats.x += dist > 0 ? diff : -diff;
                 enemyStats.x += dist > 0 ? -diff : diff;
             }
+            // 味方との衝突
+            if (allyStats.isActive) {
+                const dAlly = allyStats.x - enemyStats.x;
+                if (Math.abs(dAlly) < 1.4) {
+                    const diff = (1.4 - Math.abs(dAlly)) / 2;
+                    allyStats.x += dAlly > 0 ? diff : -diff;
+                    enemyStats.x += dAlly > 0 ? -diff : diff;
+                }
+            }
             const edge = 18;
             playerStats.x = Math.max(-edge, Math.min(edge, playerStats.x));
             enemyStats.x = Math.max(-edge, Math.min(edge, enemyStats.x));
+            if (allyStats.isActive) allyStats.x = Math.max(-edge, Math.min(edge, allyStats.x));
         }
 
         function applyKnockback(attacker, target) {
@@ -1014,8 +1048,36 @@
         function dashAttack(attacker, target, mesh) {
             displayAction(attacker, "ダッシュ攻撃");
             attacker.isAttacking = true;
-            attacker.isDashing = true;
             attacker.cooldown = 50;
+
+            // ゲッコウガの場合は瞬間移動攻撃
+            if (attacker.char && attacker.char.name === "ゲッコウガ") {
+                const dir = (attacker.x < target.x) ? 1 : -1;
+                // テレポート演出（一度消える）
+                mesh.children[0].material.opacity = 0;
+                createEffect(attacker.x, attacker.y + 1, 0x00ffff, 2.0);
+
+                setTimeout(() => {
+                    attacker.x = target.x - (1.2 * dir);
+                    mesh.children[0].material.opacity = 1;
+                    createEffect(attacker.x, attacker.y + 1, 0x00ffff, 2.0);
+
+                    // 攻撃判定
+                    let damage = attacker === playerStats ? 35 : 18;
+                    if (target.isGuarding) {
+                        damage = Math.floor(damage * 0.2);
+                    } else {
+                        applyKnockback(attacker, target);
+                    }
+                    target.hp -= damage;
+                    createEffect(target.x, target.y + 1, 0x0000ff, 3.0);
+                    updateUI();
+                    attacker.isAttacking = false;
+                }, 150);
+                return;
+            }
+
+            attacker.isDashing = true;
             const dir = (attacker.x < target.x) ? 1 : -1;
             const startX = attacker.x;
             let dashDist = 0;
@@ -1769,7 +1831,7 @@
                         } else {
                             // ゼラオラはしっかりメガシンカ後の画像を読み込む
                             sprite.material.map = textureLoader.load(enemyStats.char.evoSprites.mega);
-                            enemyStats.hp = 350;
+                            enemyStats.hp = 390; // ゼラオラのメガシンカは40増やす (350+40 or 前の350から。リクエストは390)
                             // ゼラオラはオーラを纏わせる
                             sprite.material.color.set(0x00ffff);
                         }
@@ -1777,8 +1839,23 @@
                     }, 1000);
                     return;
                 }
+                playFaintMotion(enemy);
                 gameOver();
             }
+        }
+
+        // 倒れるモーション
+        function playFaintMotion(mesh) {
+            if (!mesh) return;
+            const sprite = mesh.children[0];
+            let frame = 0;
+            function animateFaint() {
+                frame++;
+                sprite.rotation.z += 0.05 * (sprite.rotation.y === 0 ? -1 : 1);
+                sprite.position.y -= 0.05;
+                if (frame < 30) requestAnimationFrame(animateFaint);
+            }
+            animateFaint();
         }
 
         function gameOver() {
@@ -1854,6 +1931,9 @@
                 // 画面の色を反転させる簡易演出
                 const oldBg = scene.background; // 元の背景色を保存
                 scene.background = new THREE.Color(0x330033);
+
+                // 仲間が登場 (ギラティナ戦のみ)
+                spawnAlly();
 
                 // 黒い霧エフェクト
                 for (let i = 0; i < 30; i++) {
@@ -1956,7 +2036,27 @@
         window.addEventListener('load', function () {
             selectChar('greninja');
         });
+        function spawnAlly() {
+            if (ally) scene.remove(ally);
+            const allyKey = 'lucario'; // メガ進化できるポケモン
+            allyStats.char = POKEMON_DATA[allyKey];
+            allyStats.hp = allyStats.char.hp;
+            allyStats.x = playerStats.x - 2;
+            allyStats.y = 0;
+            allyStats.isActive = true;
+
+            ally = createFighter(allyKey);
+            scene.add(ally);
+            ally.position.set(allyStats.x, allyStats.y, 0);
+
+            // すぐにメガシンカさせる
+            setTimeout(() => {
+                if (allyStats.isActive) triggerEvolution(allyStats, ally);
+            }, 1000);
+        }
+
     </script>
 </body>
 
 </html>
+```
