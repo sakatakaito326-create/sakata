@@ -375,6 +375,10 @@
                 <h3>バシャーモ</h3>
                 <p>ブレイズキック & メガシンカ</p>
             </div>
+            <div class="char-card" id="card-pikachu_ash" onclick="selectChar('pikachu_ash')">
+                <h3>サトシピカチュウ</h3>
+                <p>1000万ボルト & ボルテッカー</p>
+            </div>
         </div>
         <button id="start-btn" onclick="startGame()">バトル開始！</button>
     </div>
@@ -523,6 +527,12 @@
                 evoSprites: {
                     mega: "./mega_blaziken.png"
                 }
+            },
+            pikachu_ash: {
+                name: "サトシピカチュウ", hp: 400, speed: 0.22,
+                moves: ["10万ボルト", "1000万ボルト"], evolution: null,
+                isPlayableOnly: true,
+                sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10160.png"
             }
         };
 
@@ -568,9 +578,9 @@
                 playerStats.char = POKEMON_DATA[selectedChar];
                 playerStats.hp = playerStats.char.hp;
 
-                // 1戦目の敵は通常キャラからのみ選択（isBossがtrueのものを除く）
+                // 1戦目の敵は通常キャラからのみ選択（isBossがtrueのもの、およびisPlayableOnlyがtrueのものを除く）
                 const keysArr = Object.keys(POKEMON_DATA).filter(function (key) {
-                    return !POKEMON_DATA[key].isBoss;
+                    return !POKEMON_DATA[key].isBoss && !POKEMON_DATA[key].isPlayableOnly;
                 });
                 const enemyKey = keysArr[Math.floor(Math.random() * keysArr.length)];
                 enemyStats.char = POKEMON_DATA[enemyKey];
@@ -723,8 +733,12 @@
             if (keys['KeyQ'] && !playerStats.isAttacking && playerStats.cooldown <= 0) {
                 dashAttack(playerStats, enemyStats, player);
             }
-            if (keys['KeyE']) {
+            if (keys['KeyE'] && playerStats.cooldown <= 0) {
                 playerStats.isGuarding = true;
+                // サトシピカチュウはエレキネット
+                if (playerStats.char && playerStats.char.name === "サトシピカチュウ") {
+                    drawElectroweb(playerStats);
+                }
             } else {
                 playerStats.isGuarding = false;
             }
@@ -927,6 +941,7 @@
             else if (charName === "ゼラオラ") zeraoraMove(attacker, target, mesh);
             else if (charName === "バシャーモ") blazeKick(attacker, target, mesh);
             else if (charName === "ダークルギア") launchProjectile(attacker, target, 0x222222, "dark_aura"); // エアロブラスト代用
+            else if (charName === "サトシピカチュウ") pikachuMove(attacker, target, mesh);
 
             // 伝説のポケモン(隠しボス)の攻撃後の隙は通常3秒 (60fps * 3 = 180)
             if (["アーマードミュウツー", "パルキア", "ダークライ", "ダークルギア", "メガミュウツーX", "ギラティナ", "ゼラオラ"].includes(currentName)) {
@@ -1077,6 +1092,13 @@
                 return;
             }
 
+            // サトシピカチュウの場合はボルテッカー
+            if (attacker.char && attacker.char.name === "サトシピカチュウ") {
+                displayAction(attacker, "ボルテッカー");
+                voltTackle(attacker, target, mesh, 35, false);
+                return;
+            }
+
             attacker.isDashing = true;
             const dir = (attacker.x < target.x) ? 1 : -1;
             const startX = attacker.x;
@@ -1110,12 +1132,13 @@
 
         // Y: スカイアッパー (Sky Upper)
         function skyUpper(attacker, target, mesh) {
-            displayAction(attacker, "スカイアッパー");
+            const isPikachu = attacker.char && attacker.char.name === "サトシピカチュウ";
+            displayAction(attacker, isPikachu ? "アイアンテール" : "スカイアッパー");
             attacker.isAttacking = true;
             attacker.cooldown = 45;
             playAttackMotion(mesh);
             if (Math.abs(attacker.x - target.x) < 2.0) {
-                let damage = attacker === playerStats ? 35 : 18;
+                let damage = isPikachu ? 40 : 18;
                 if (target.isGuarding) {
                     damage = Math.floor(damage * 0.2);
                 } else {
@@ -1123,9 +1146,10 @@
                 }
                 target.hp -= damage;
                 // 敵を打ち上げる
-                target.vy = 0.4;
+                target.vy = isPikachu ? 0.6 : 0.4;
                 target.isJumping = true;
-                createEffect(target.x, target.y + 1, 0xffff00, 3.0);
+                const color = isPikachu ? 0xcccccc : 0xffff00;
+                createEffect(target.x, target.y + 1, color, 3.0);
                 updateUI();
             }
             setTimeout(function () { attacker.isAttacking = false; }, 400);
@@ -1543,6 +1567,9 @@
             } else if (evolvedName === "メガシンカ" && charName === "エルレイド") {
                 displayAction(attacker, "究極技：三つの剣術");
                 threeSwordTechnique(attacker, target, mesh);
+            } else if (charName === "サトシピカチュウ") {
+                displayAction(attacker, "究極技：高火力ボルテッカー");
+                voltTackle(attacker, target, mesh, 120, true);
             } else {
                 // 究極技がない場合は通常攻撃（または何もしない）
                 attacker.usedUltimate = false; // フラグ戻す
@@ -2036,6 +2063,100 @@
         window.addEventListener('load', function () {
             selectChar('greninja');
         });
+        function pikachuMove(attacker, target, mesh) {
+            const rand = Math.random();
+            if (rand < 0.6) {
+                displayAction(attacker, "10万ボルト");
+                thunderbolt(attacker, target);
+            } else {
+                displayAction(attacker, "1000万ボルト");
+                tenMillionVoltThunderbolt(attacker, target);
+            }
+        }
+
+        function thunderbolt(attacker, target) {
+            const color = 0xffff00;
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    drawLightningLine(attacker.x, attacker.y + 1, target.x, target.y + 1, color);
+                    if (Math.abs(attacker.x - target.x) < 5.0) {
+                        target.hp -= 3;
+                        updateUI();
+                        createEffect(target.x, target.y + 1, color, 1.0);
+                    }
+                }, i * 100);
+            }
+        }
+
+        function tenMillionVoltThunderbolt(attacker, target) {
+            const colors = [0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff];
+            attacker.cooldown = 100;
+            let count = 0;
+            const interval = setInterval(() => {
+                const color = colors[count % colors.length];
+                drawLightningLine(attacker.x, attacker.y + 1, target.x, target.y + 1, color);
+                target.hp -= 2;
+                updateUI();
+                createEffect(target.x, target.y + 1, color, 2.0);
+                count++;
+                if (count > 20) {
+                    clearInterval(interval);
+                    applyKnockback(attacker, target);
+                }
+            }, 50);
+        }
+
+        function drawLightningLine(x1, y1, x2, y2, color) {
+            const points = [];
+            const segments = 5;
+            for (let i = 0; i <= segments; i++) {
+                points.push(new THREE.Vector3(
+                    x1 + (x2 - x1) * (i / segments) + (i > 0 && i < segments ? (Math.random() - 0.5) * 1.5 : 0),
+                    y1 + (y2 - y1) * (i / segments) + (i > 0 && i < segments ? (Math.random() - 0.5) * 1.5 : 0),
+                    0.5
+                ));
+            }
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 3 });
+            const line = new THREE.Line(geo, mat);
+            scene.add(line);
+            setTimeout(() => scene.remove(line), 150);
+        }
+
+        function voltTackle(attacker, target, mesh, damage, isUltimate) {
+            const dir = (attacker.x < target.x) ? 1 : -1;
+            const startX = attacker.x;
+            let dist = 0;
+            const maxDist = isUltimate ? 15.0 : 6.0;
+
+            function move() {
+                attacker.x += 0.5 * dir;
+                dist += 0.5;
+                createEffect(attacker.x, attacker.y + 0.5, 0xffff00, isUltimate ? 2.0 : 1.0);
+
+                if (Math.abs(attacker.x - target.x) < 1.5) {
+                    target.hp -= damage;
+                    applyKnockback(attacker, target);
+                    createEffect(target.x, target.y + 1, 0xffff00, isUltimate ? 5.0 : 2.0);
+                    updateUI();
+                    attacker.isAttacking = false;
+                    return;
+                }
+
+                if (dist < maxDist) requestAnimationFrame(move);
+                else attacker.isAttacking = false;
+            }
+            move();
+        }
+        function drawElectroweb(attacker) {
+            const geo = new THREE.SphereGeometry(1.2, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true, transparent: true, opacity: 0.5 });
+            const web = new THREE.Mesh(geo, mat);
+            web.position.set(attacker.x, attacker.y + 1, 0.5);
+            scene.add(web);
+            setTimeout(() => scene.remove(web), 100);
+        }
+
         function spawnAlly() {
             if (ally) scene.remove(ally);
             const allyKey = 'lucario'; // メガ進化できるポケモン
@@ -2058,5 +2179,4 @@
     </script>
 </body>
 
-</html>
 ```
